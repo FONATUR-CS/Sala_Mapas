@@ -1,0 +1,4228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Desarrollos FONATUR | Geoportal Interactivo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* ============================================
+           TOKENS DE DISEÑO (Design System)
+        ============================================ */
+        :root {
+            /* Colores principales */
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #e74c3c;
+            --highlight-color: #3498db;
+            --success-color: #27ae60;
+            
+            /* Tipografía */
+            --text-color: #2c3e50;
+            --text-secondary: #7f8c8d;
+            --text-muted: #95a5a6;
+            
+            /* Fondos */
+            --bg-color: #ecf0f1;
+            --sidebar-bg: #ffffff;
+            --card-bg: #ffffff;
+            
+            /* Bordes y divisores */
+            --border-color: #bdc3c7;
+            --border-light: #e0e6e8;
+            
+            /* Sombras */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
+            --shadow-xl: 0 12px 32px rgba(0, 0, 0, 0.18);
+            
+            /* Transiciones */
+            --transition-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            
+            /* Espaciado */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 16px;
+            --spacing-lg: 24px;
+            --spacing-xl: 32px;
+            
+            /* Layout */
+            --sidebar-width: 420px;
+            --header-height: 140px;
+            --footer-height: 48px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+        }
+
+        #container {
+            display: flex;
+            height: 100vh;
+            width: 100%;
+        }
+
+        #sidebar {
+            width: 380px;
+            background-color: var(--sidebar-bg);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        #sidebar.collapsed {
+            transform: translateX(-380px);
+        }
+
+        .header {
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: var(--spacing-lg) var(--spacing-lg);
+            box-shadow: var(--shadow-md);
+            position: relative;
+            min-height: 120px;
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-color) 0%, #c0392b 100%);
+        }
+
+        .header-content {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.5px;
+            line-height: 1.2;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.95;
+            line-height: 1.5;
+            font-weight: 300;
+            margin: 0;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-top: var(--spacing-sm);
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .header-stat {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-stat-icon {
+            font-size: 16px;
+        }
+
+        .timeline-control {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .timeline-label {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: var(--spacing-sm);
+            display: block;
+        }
+
+        .timeline-slider {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: #dfe6e9;
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            margin-bottom: var(--spacing-sm);
+        }
+
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.4);
+            transition: transform 0.2s var(--transition-smooth);
+        }
+
+        .timeline-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+
+        .timeline-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.4);
+        }
+
+        .timeline-years {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .timeline-current {
+            text-align: center;
+            font-size: 13px;
+            color: var(--accent-color);
+            font-weight: 600;
+            margin-top: var(--spacing-sm);
+        }
+
+        .filter-chips {
+            display: flex;
+            gap: var(--spacing-sm);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-bottom: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .filter-chip {
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s var(--transition-smooth);
+            border: 2px solid var(--border-light);
+            background: white;
+            color: var(--text-secondary);
+        }
+
+        .filter-chip:hover {
+            border-color: var(--highlight-color);
+            color: var(--highlight-color);
+        }
+
+        .filter-chip.active {
+            background: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .search-container {
+            padding: 20px 24px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-box {
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 40px 14px 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s var(--transition-smooth);
+            background-color: #f8f9fa;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--highlight-color);
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.12);
+        }
+
+        .search-input::placeholder {
+            color: #95a5a6;
+            font-weight: 300;
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+
+        .sites-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 24px;
+        }
+
+        .site-card {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-left: 4px solid transparent;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 14px;
+            cursor: pointer;
+            transition: all 0.35s var(--transition-smooth);
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-carousel {
+            width: 100%;
+            height: 140px;
+            position: relative;
+            overflow: hidden;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .card-carousel img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .card-carousel img.active {
+            opacity: 1;
+        }
+
+        .carousel-indicators {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 10;
+        }
+
+        .carousel-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .carousel-dot.active {
+            background: white;
+            transform: scale(1.3);
+        }
+
+        .view-more-btn {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 6px 14px;
+            background: var(--highlight-color);
+            color: white;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .view-more-btn:hover {
+            background: var(--primary-color);
+            transform: translateY(-1px);
+        }
+
+        .detail-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .detail-modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-xl);
+            position: relative;
+        }
+
+        .modal-header {
+            background: linear-gradient(180deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 24px;
+            border-radius: 16px 16px 0 0;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 24px;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        .modal-carousel {
+            width: 100%;
+            height: 300px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .modal-carousel img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            position: absolute;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        .modal-carousel img.active {
+            opacity: 1;
+        }
+
+        .carousel-nav {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .carousel-nav:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .carousel-nav.prev {
+            left: 10px;
+        }
+
+        .carousel-nav.next {
+            right: 10px;
+        }
+
+        .modal-body {
+            padding: 24px;
+        }
+
+        .modal-section {
+            margin-bottom: 20px;
+        }
+
+        .modal-section h3 {
+            color: var(--primary-color);
+            font-size: 18px;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        .modal-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .modal-info-item {
+            background: var(--bg-color);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        .modal-info-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .modal-info-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .site-card:hover {
+            transform: translateX(4px);
+            box-shadow: var(--shadow-md);
+            border-left-color: var(--accent-color);
+        }
+
+        .site-card.active {
+            border-left-color: var(--accent-color);
+            background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+            box-shadow: var(--shadow-md);
+        }
+
+        .site-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .site-name {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .site-badge {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #c0392b 100%);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 16px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+        }
+
+        .site-state {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            font-weight: 400;
+        }
+
+        .site-state::before {
+            content: '📍';
+            margin-right: 8px;
+            font-size: 16px;
+        }
+
+        .site-year {
+            font-size: 12px;
+            color: #95a5a6;
+            font-weight: 400;
+        }
+
+        #map {
+            flex: 1;
+            position: relative;
+            width: 100%;
+        }
+
+        .toggle-sidebar {
+            position: fixed;
+            top: 20px;
+            left: calc(var(--sidebar-width) + 20px);
+            z-index: 1001;
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px 16px;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            transition: all 0.4s var(--transition-smooth);
+            font-size: 18px;
+            color: var(--primary-color);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toggle-sidebar:hover {
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .toggle-sidebar.collapsed {
+            left: 20px;
+            background-color: var(--accent-color);
+            color: white;
+            border-color: var(--accent-color);
+        }
+
+        .toggle-sidebar:active {
+            transform: translateY(0);
+        }
+
+        .map-legend {
+            position: absolute;
+            bottom: 80px;
+            right: 20px;
+            background: white;
+            border-radius: 12px;
+            padding: var(--spacing-md);
+            box-shadow: var(--shadow-lg);
+            z-index: 500;
+            min-width: 200px;
+            max-width: 280px;
+        }
+
+        .legend-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: var(--spacing-md);
+            padding-bottom: var(--spacing-sm);
+            border-bottom: 2px solid var(--accent-color);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-sm);
+            margin-bottom: var(--spacing-sm);
+            font-size: 13px;
+            color: var(--text-color);
+        }
+
+        .legend-symbol {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .legend-symbol.cip {
+            background: linear-gradient(135deg, var(--highlight-color) 0%, #2980b9 100%);
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .legend-symbol.marina {
+            background: linear-gradient(135deg, var(--success-color) 0%, #1e8449 100%);
+            border: 2px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        .legend-symbol.active {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #c0392b 100%);
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-sm);
+            z-index: 500;
+        }
+
+        .control-button {
+            background: white;
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            box-shadow: var(--shadow-md);
+            transition: all 0.3s var(--transition-smooth);
+            font-size: 14px;
+            color: var(--primary-color);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+
+        .control-button:hover {
+            background-color: var(--highlight-color);
+            color: white;
+            border-color: var(--highlight-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .control-button:active {
+            transform: translateY(0);
+        }
+
+        .map-stats {
+            background: white;
+            border-radius: 10px;
+            padding: var(--spacing-md);
+            box-shadow: var(--shadow-md);
+            display: flex;
+            gap: var(--spacing-lg);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent-color);
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .info-popup {
+            max-width: 280px;
+        }
+
+        .popup-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--accent-color);
+        }
+
+        .popup-content {
+            font-size: 13px;
+            line-height: 1.7;
+            color: var(--text-color);
+        }
+
+        .popup-content strong {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .popup-list {
+            list-style: none;
+            margin: 10px 0;
+        }
+
+        .popup-list li {
+            padding: 7px 0;
+            padding-left: 22px;
+            position: relative;
+            line-height: 1.5;
+        }
+
+        .popup-list li::before {
+            content: '●';
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+            font-size: 14px;
+        }
+
+        .popup-image {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin: 12px 0;
+        }
+
+        .popup-footer {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Scrollbar personalizado */
+        .sites-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .sites-list::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-radius: 4px;
+        }
+
+        .sites-list::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+            transition: background 0.3s ease;
+        }
+
+        .sites-list::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-content::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-radius: 4px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Transiciones suaves para marcadores */
+        .leaflet-marker-icon {
+            transition: opacity 250ms ease, transform 250ms ease;
+        }
+
+        .leaflet-interactive {
+            transition: opacity 250ms ease, fill-opacity 250ms ease, stroke-opacity 250ms ease;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+                width: 100%;
+                position: absolute;
+                height: 100vh;
+                z-index: 1002;
+            }
+
+                transform: translateX(-100%);
+            }
+
+            .toggle-sidebar {
+                left: 20px;
+            }
+
+            .toggle-sidebar.collapsed {
+                left: 20px;
+            }
+
+            .map-legend {
+                bottom: 20px;
+                right: 10px;
+                max-width: 200px;
+            }
+
+            .map-controls {
+                top: 80px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .modal-content {
+                max-width: 95%;
+                max-height: 90vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <aside id="sidebar">
+            <header class="header">
+                <div class="header-content">
+                    <h1>Desarrollos FONATUR</h1>
+                    <p>Centros Integralmente Planeados y Marinas Turísticas de México</p>
+                    <div class="header-stats">
+                        <div class="header-stat">
+                            <span class="header-stat-icon">📊</span>
+                            <span id="totalSites">0 desarrollos</span>
+                        </div>
+                        <div class="header-stat">
+                            <span class="header-stat-icon">🗺️</span>
+                            <span id="visibleSites">0 visibles</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="timeline-control">
+                <label class="timeline-label">Línea de Tiempo</label>
+                <input type="range" class="timeline-slider" id="timelineSlider" min="1970" max="2025" value="2025" step="1">
+                <div class="timeline-years">
+                    <span>1970</span>
+                    <span>1985</span>
+                    <span>2000</span>
+                    <span>2015</span>
+                    <span>2025</span>
+                </div>
+                <div class="timeline-current">
+                    Año: <span id="currentYear">2025</span>
+                </div>
+            </div>
+
+            <div class="filter-chips">
+                <button class="filter-chip active" data-filter="all">Todos</button>
+                <button class="filter-chip" data-filter="cip">CIP</button>
+                <button class="filter-chip" data-filter="marina">Marinas</button>
+            </div>
+
+            <div class="search-container">
+                <div class="search-box">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nombre o ubicación...">
+                    <span class="search-icon">🔍</span>
+                </div>
+            </div>
+
+            <div class="sites-list" id="sitesList"></div>
+        </aside>
+
+        <main id="map"></main>
+
+        <button class="toggle-sidebar" id="toggleSidebar">
+            <span id="toggleIcon">◀</span>
+        </button>
+
+        <div class="map-legend">
+            <div class="legend-title">Leyenda</div>
+            <div class="legend-item">
+                <div class="legend-symbol cip"></div>
+                <span>CIP - Centro Integralmente Planeado</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol marina"></div>
+                <span>Marina Turística</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol active"></div>
+                <span>Seleccionado</span>
+            </div>
+        </div>
+
+        <div class="map-controls">
+            <button class="control-button" id="resetView">🏠 Vista Inicial</button>
+            <button class="control-button" id="clusterToggle">📍 Agrupar Sitios</button>
+        </div>
+    </div>
+
+    <div class="detail-modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"></h2>
+                <button class="modal-close" id="modalClose">×</button>
+            </div>
+            <div class="modal-carousel" id="modalCarousel">
+                <button class="carousel-nav prev" id="carouselPrev">‹</button>
+                <button class="carousel-nav next" id="carouselNext">›</button>
+            </div>
+            <div class="carousel-indicators" id="modalIndicators"></div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    
+    <script>
+        const sitesData = [
+            {
+                name: "Cancún",
+                type: "cip",
+                state: "Quintana Roo",
+                lat: 21.1619,
+                lng: -86.8515,
+                year: 1974,
+                description: "Primer CIP de FONATUR, transformó una isla de pescadores en el principal destino turístico de México",
+                details: {
+                    area: "1,200 ha",
+                    population: "900,000+ habitantes",
+                    rooms: "45,000+ cuartos de hotel",
+                    visitors: "6 millones de turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1568402102990-bc541580b59f?w=800",
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800",
+                    "https://images.unsplash.com/photo-1512813498716-47110fdbd281?w=800"
+                ]
+            },
+            {
+                name: "Ixtapa",
+                type: "cip",
+                state: "Guerrero",
+                lat: 17.6519,
+                lng: -101.6346,
+                year: 1976,
+                description: "Desarrollo turístico planificado en la costa del Pacífico mexicano",
+                details: {
+                    area: "1,800 ha",
+                    population: "45,000 habitantes",
+                    rooms: "5,000+ cuartos de hotel",
+                    visitors: "500,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1582610285985-a42d3d8c7041?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+            },
+            {
+                name: "Los Cabos",
+                type: "cip",
+                state: "Baja California Sur",
+                lat: 22.8905,
+                lng: -109.9167,
+                year: 1976,
+                description: "Desarrollo turístico de lujo en el extremo sur de la península de Baja California",
+                details: {
+                    area: "2,300 ha",
+                    population: "350,000+ habitantes",
+                    rooms: "15,000+ cuartos de hotel",
+                    visitors: "3 millones de turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800",
+                    "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+            },
+            {
+                name: "Loreto",
+                type: "cip",
+                state: "Baja California Sur",
+                lat: 26.0129,
+                lng: -111.3486,
+                year: 1976,
+                description: "Centro turístico con enfoque en ecoturismo y turismo cultural",
+                details: {
+                    area: "800 ha",
+                    population: "20,000 habitantes",
+                    rooms: "1,200 cuartos de hotel",
+                    visitors: "150,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+            },
+            {
+                name: "Huatulco",
+                type: "cip",
+                state: "Oaxaca",
+                lat: 15.7653,
+                lng: -96.1292,
+                year: 1984,
+                description: "Desarrollo turístico sustentable con 9 bahías y 36 playas en la costa oaxaqueña",
+                details: {
+                    area: "21,000 ha",
+                    population: "55,000 habitantes",
+                    rooms: "5,500 cuartos de hotel",
+                    visitors: "800,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800"
+                ]
+            },
+            {
+                name: "Marina Ixtapa",
+                type: "marina",
+                state: "Guerrero",
+                lat: 17.6650,
+                lng: -101.6400,
+                year: 1980,
+                description: "Marina turística complementaria al CIP Ixtapa con capacidad para embarcaciones deportivas",
+                details: {
+                    area: "15 ha",
+                    slips: "600 posiciones",
+                    services: "Gastronomía, comercios, servicios náuticos",
+                    visitors: "200,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800"
+                ]
+            },
+            {
+                name: "Marina Los Cabos",
+                type: "marina",
+                state: "Baja California Sur",
+                lat: 22.8850,
+                lng: -109.9100,
+                year: 1985,
+                description: "Marina de clase mundial para yates y embarcaciones de lujo",
+                details: {
+                    area: "12 ha",
+                    slips: "380 posiciones",
+                    services: "Servicios náuticos completos, restaurantes, tiendas",
+                    visitors: "300,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+            },
+            {
+                name: "Marina Huatulco",
+                type: "marina",
+                state: "Oaxaca",
+                lat: 15.7580,
+                lng: -96.1200,
+                year: 1988,
+                description: "Marina turística sustentable en Bahía Santa Cruz",
+                details: {
+                    area: "10 ha",
+                    slips: "120 posiciones",
+                    services: "Comercios, restaurantes, servicios náuticos",
+                    visitors: "100,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+            }
+        ];
+
+        // Estado global de la aplicación
+        const appState = {
+            map: null,
+            markers: [],
+            markerCluster: null,
+            selectedSite: null,
+            currentFilter: 'all',
+            currentYear: 2025,
+            clusteringEnabled: true,
+            searchTerm: ''
+        };
+
+        // Inicializar mapa
+        function initMap() {
+            appState.map = L.map('map').setView([23.6345, -102.5528], 5);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors | FONATUR Geoportal 2026',
+                maxZoom: 19
+            }).addTo(appState.map);
+
+            appState.markerCluster = L.markerClusterGroup({
+                maxClusterRadius: 60,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true
+            });
+
+            renderMarkers();
+        }
+
+        // Crear ícono personalizado según tipo
+        function createCustomIcon(type, isSelected) {
+            const colors = {
+                cip: isSelected ? '#e74c3c' : '#3498db',
+                marina: isSelected ? '#e74c3c' : '#27ae60'
+            };
+
+            return L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="
+                    background: linear-gradient(135deg, ${colors[type]} 0%, ${type === 'cip' ? '#2980b9' : '#1e8449'} 100%);
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 50%;
+                    border: 3px solid white;
+                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                    transition: all 0.3s ease;
+                    ${isSelected ? 'transform: scale(1.3);' : ''}
+                "></div>`,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+        }
+
+        // Renderizar marcadores en el mapa
+        function renderMarkers() {
+            appState.markers.forEach(marker => {
+                appState.map.removeLayer(marker);
+            });
+            appState.markers = [];
+            appState.markerCluster.clearLayers();
+
+            const filteredSites = getFilteredSites();
+
+            filteredSites.forEach(site => {
+                const isSelected = appState.selectedSite?.name === site.name;
+                const icon = createCustomIcon(site.type, isSelected);
+
+                const marker = L.marker([site.lat, site.lng], { icon })
+                    .bindPopup(createPopupContent(site), {
+                        maxWidth: 300,
+                        className: 'info-popup'
+                    });
+
+                marker.on('click', () => selectSite(site));
+                
+                appState.markers.push(marker);
+                
+                if (appState.clusteringEnabled) {
+                    appState.markerCluster.addLayer(marker);
+                } else {
+                    marker.addTo(appState.map);
+                }
+            });
+
+            if (appState.clusteringEnabled) {
+                appState.map.addLayer(appState.markerCluster);
+            }
+
+            updateStats();
+        }
+
+        // Crear contenido del popup
+        function createPopupContent(site) {
+            const typeLabel = site.type === 'cip' ? 'CIP' : 'Marina';
+            const mainImage = site.images && site.images.length > 0 ? site.images[0] : '';
+
+            return `
+                <div class="popup-content">
+                    <div class="popup-title">${site.name}</div>
+                    ${mainImage ? `<img src="${mainImage}" alt="${site.name}" class="popup-image">` : ''}
+                    <p><strong>Tipo:</strong> ${typeLabel}</p>
+                    <p><strong>Estado:</strong> ${site.state}</p>
+                    <p><strong>Año:</strong> ${site.year}</p>
+                    <p>${site.description}</p>
+                    ${site.details ? `
+                        <ul class="popup-list">
+                            ${Object.entries(site.details).slice(0, 2).map(([key, value]) => 
+                                `<li><strong>${key}:</strong> ${value}</li>`
+                            ).join('')}
+                        </ul>
+                    ` : ''}
+                    <div class="popup-footer">Haga clic en la tarjeta para ver más detalles</div>
+                </div>
+            `;
+        }
+
+        // Filtrar sitios según criterios actuales
+        function getFilteredSites() {
+            return sitesData.filter(site => {
+                const matchesFilter = appState.currentFilter === 'all' || site.type === appState.currentFilter;
+                const matchesYear = site.year <= appState.currentYear;
+                const matchesSearch = !appState.searchTerm || 
+                    site.name.toLowerCase().includes(appState.searchTerm.toLowerCase()) ||
+                    site.state.toLowerCase().includes(appState.searchTerm.toLowerCase());
+                
+                return matchesFilter && matchesYear && matchesSearch;
+            });
+        }
+
+        // Renderizar lista de sitios
+        function renderSitesList() {
+            const sitesList = document.getElementById('sitesList');
+            const filteredSites = getFilteredSites();
+
+            if (filteredSites.length === 0) {
+                sitesList.innerHTML = `
+                    <div style="text-align: center; padding: 40px 20px; color: var(--text-secondary);">
+                        <div style="font-size: 48px; margin-bottom: 16px;">🔍</div>
+                        <p>No se encontraron desarrollos con los filtros actuales</p>
+                    </div>
+                `;
+                return;
+            }
+
+            sitesList.innerHTML = filteredSites.map(site => {
+                const typeLabel = site.type === 'cip' ? 'CIP' : 'Marina';
+                const isActive = appState.selectedSite?.name === site.name;
+                const mainImage = site.images && site.images.length > 0 ? site.images[0] : '';
+
+                return `
+                    <div class="site-card ${isActive ? 'active' : ''}" data-site="${site.name}">
+                        ${mainImage ? `
+                            <div class="card-carousel" data-images='${JSON.stringify(site.images)}'>
+                                ${site.images.map((img, idx) => 
+                                    `<img src="${img}" alt="${site.name}" class="${idx === 0 ? 'active' : ''}">`
+                                ).join('')}
+                                ${site.images.length > 1 ? `
+                                    <div class="carousel-indicators">
+                                        ${site.images.map((_, idx) => 
+                                            `<div class="carousel-dot ${idx === 0 ? 'active' : ''}" data-index="${idx}"></div>`
+                                        ).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+                        <div class="site-header">
+                            <div>
+                                <h3 class="site-name">${site.name}</h3>
+                                <div class="site-state">${site.state}</div>
+                                <div class="site-year">Fundado en ${site.year}</div>
+                            </div>
+                            <span class="site-badge">${typeLabel}</span>
+                        </div>
+                        <button class="view-more-btn">Ver detalles</button>
+                    </div>
+                `;
+            }).join('');
+
+            // Agregar eventos a las tarjetas
+            document.querySelectorAll('.site-card').forEach(card => {
+                const siteName = card.dataset.site;
+                const site = sitesData.find(s => s.name === siteName);
+
+                card.querySelector('.view-more-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    showModal(site);
+                });
+
+                card.addEventListener('click', () => selectSite(site));
+
+                // Carrusel de tarjetas
+                const carousel = card.querySelector('.card-carousel');
+                if (carousel && site.images.length > 1) {
+                    let currentIndex = 0;
+                    const images = carousel.querySelectorAll('img');
+                    const dots = carousel.querySelectorAll('.carousel-dot');
+
+                    const rotateCarousel = () => {
+                        images[currentIndex].classList.remove('active');
+                        dots[currentIndex].classList.remove('active');
+                        currentIndex = (currentIndex + 1) % images.length;
+                        images[currentIndex].classList.add('active');
+                        dots[currentIndex].classList.add('active');
+                    };
+
+                    const interval = setInterval(rotateCarousel, 3000);
+
+                    dots.forEach((dot, idx) => {
+                        dot.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            clearInterval(interval);
+                            images[currentIndex].classList.remove('active');
+                            dots[currentIndex].classList.remove('active');
+                            currentIndex = idx;
+                            images[currentIndex].classList.add('active');
+                            dots[currentIndex].classList.add('active');
+                        });
+                    });
+                }
+            });
+        }
+
+        // Seleccionar sitio
+        function selectSite(site) {
+            appState.selectedSite = site;
+            appState.map.setView([site.lat, site.lng], 12, {
+                animate: true,
+                duration: 1
+            });
+            renderMarkers();
+            renderSitesList();
+        }
+
+        // Mostrar modal con detalles
+        function showModal(site) {
+            const modal = document.getElementById('detailModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalBody = document.getElementById('modalBody');
+            const modalCarousel = document.getElementById('modalCarousel');
+            const modalIndicators = document.getElementById('modalIndicators');
+
+            modalTitle.textContent = site.name;
+
+            // Configurar carrusel del modal
+            if (site.images && site.images.length > 0) {
+                modalCarousel.innerHTML = `
+                    <button class="carousel-nav prev" id="carouselPrev">‹</button>
+                    ${site.images.map((img, idx) => 
+                        `<img src="${img}" alt="${site.name}" class="${idx === 0 ? 'active' : ''}">`
+                    ).join('')}
+                    <button class="carousel-nav next" id="carouselNext">›</button>
+                `;
+
+                modalIndicators.innerHTML = site.images.map((_, idx) => 
+                    `<div class="carousel-dot ${idx === 0 ? 'active' : ''}" data-index="${idx}"></div>`
+                ).join('');
+
+                setupModalCarousel(site.images.length);
+            }
+
+            // Contenido del modal
+            const typeLabel = site.type === 'cip' ? 'Centro Integralmente Planeado (CIP)' : 'Marina Turística';
+            
+            modalBody.innerHTML = `
+                <div class="modal-section">
+                    <h3>Información General</h3>
+                    <div class="modal-info-grid">
+                        <div class="modal-info-item">
+                            <div class="modal-info-label">Tipo de Desarrollo</div>
+                            <div class="modal-info-value">${typeLabel}</div>
+                        </div>
+                        <div class="modal-info-item">
+                            <div class="modal-info-label">Estado</div>
+                            <div class="modal-info-value">${site.state}</div>
+                        </div>
+                        <div class="modal-info-item">
+                            <div class="modal-info-label">Año de Fundación</div>
+                            <div class="modal-info-value">${site.year}</div>
+                        </div>
+                        <div class="modal-info-item">
+                            <div class="modal-info-label">Ubicación</div>
+                            <div class="modal-info-value">${site.lat.toFixed(4)}°, ${site.lng.toFixed(4)}°</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>Descripción</h3>
+                    <p style="line-height: 1.7; color: var(--text-color);">${site.description}</p>
+                </div>
+
+                ${site.details ? `
+                    <div class="modal-section">
+                        <h3>Datos Clave</h3>
+                        <div class="modal-info-grid">
+                            ${Object.entries(site.details).map(([key, value]) => `
+                                <div class="modal-info-item">
+                                    <div class="modal-info-label">${key}</div>
+                                    <div class="modal-info-value">${value}</div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+
+            modal.classList.add('active');
+        }
+
+        // Configurar carrusel del modal
+        function setupModalCarousel(totalImages) {
+            let currentIndex = 0;
+            const images = document.querySelectorAll('.modal-carousel img');
+            const dots = document.querySelectorAll('#modalIndicators .carousel-dot');
+            const prevBtn = document.getElementById('carouselPrev');
+            const nextBtn = document.getElementById('carouselNext');
+
+            const updateCarousel = (newIndex) => {
+                images[currentIndex].classList.remove('active');
+                dots[currentIndex].classList.remove('active');
+                currentIndex = newIndex;
+                images[currentIndex].classList.add('active');
+                dots[currentIndex].classList.add('active');
+            };
+
+            prevBtn.addEventListener('click', () => {
+                const newIndex = currentIndex === 0 ? totalImages - 1 : currentIndex - 1;
+                updateCarousel(newIndex);
+            });
+
+            nextBtn.addEventListener('click', () => {
+                const newIndex = (currentIndex + 1) % totalImages;
+                updateCarousel(newIndex);
+            });
+
+            dots.forEach((dot, idx) => {
+                dot.addEventListener('click', () => updateCarousel(idx));
+            });
+        }
+
+        // Actualizar estadísticas
+        function updateStats() {
+            const filteredSites = getFilteredSites();
+            document.getElementById('totalSites').textContent = `${sitesData.length} desarrollos`;
+            document.getElementById('visibleSites').textContent = `${filteredSites.length} visibles`;
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            renderSitesList();
+            updateStats();
+
+            // Timeline
+            const timelineSlider = document.getElementById('timelineSlider');
+            const currentYearDisplay = document.getElementById('currentYear');
+
+            timelineSlider.addEventListener('input', (e) => {
+                appState.currentYear = parseInt(e.target.value);
+                currentYearDisplay.textContent = appState.currentYear;
+                renderMarkers();
+                renderSitesList();
+            });
+
+            // Filtros
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                    chip.classList.add('active');
+                    appState.currentFilter = chip.dataset.filter;
+                    renderMarkers();
+                    renderSitesList();
+                });
+            });
+
+            // Búsqueda
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', (e) => {
+                appState.searchTerm = e.target.value;
+                renderMarkers();
+                renderSitesList();
+            });
+
+            // Toggle sidebar
+            const toggleBtn = document.getElementById('toggleSidebar');
+            const sidebar = document.getElementById('sidebar');
+            const toggleIcon = document.getElementById('toggleIcon');
+
+            toggleBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                toggleBtn.classList.toggle('collapsed');
+                toggleIcon.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+            });
+
+            // Reset view
+            document.getElementById('resetView').addEventListener('click', () => {
+                appState.map.setView([23.6345, -102.5528], 5);
+                appState.selectedSite = null;
+                renderMarkers();
+                renderSitesList();
+            });
+
+            // Cluster toggle
+            const clusterToggle = document.getElementById('clusterToggle');
+            clusterToggle.addEventListener('click', () => {
+                appState.clusteringEnabled = !appState.clusteringEnabled;
+                clusterToggle.textContent = appState.clusteringEnabled ? '📍 Agrupar Sitios' : '📍 Mostrar Todos';
+                renderMarkers();
+            });
+
+            // Modal
+            const modal = document.getElementById('detailModal');
+            const modalClose = document.getElementById('modalClose');
+
+            modalClose.addEventListener('click', () => {
+                modal.classList.remove('active');
+            });
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('active');
+                }
+            });
+        });
+    </script>
+</body>
+</html>         details: {
+                    area: "30 ha",
+                    slips: "380 posiciones",
+                    services: "Marina seca, reparaciones, gastronomía",
+                    visitors: "300,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800"
+                ]
+            },
+            {
+                name: "Marina Cozumel",
+                type: "marina",
+                state: "Quintana Roo",
+                lat: 20.5083,
+                lng: -86.9458,
+                year: 1990,
+                description: "Marina turística en la isla de Cozumel, importante puerto de cruceros",
+                details: {
+                    area: "12 ha",
+                    slips: "200 posiciones",
+                    services: "Terminal de cruceros, comercios, restaurantes",
+                    visitors: "4 millones de cruceristas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800"
+                ]
+            },
+            {
+                name: "Playa Espíritu",
+                type: "cip",
+                state: "Sinaloa",
+                lat: 23.2494,
+                lng: -106.4111,
+                year: 2010,
+                description: "Desarrollo turístico residencial sustentable en la costa de Sinaloa",
+                details: {
+                    area: "3,200 ha",
+                    population: "En desarrollo",
+                    rooms: "Planeados 8,000 cuartos",
+                    visitors: "Proyectado 500,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+                    "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800"
+                ]
+            },
+            {
+                name: "Huatulco",
+                type: "cip",
+                state: "Oaxaca",
+                lat: 15.7650,
+                lng: -96.1297,
+                year: 1984,
+                description: "Desarrollo sustentable con nueve bahías y 36 playas en la costa de Oaxaca",
+                details: {
+                    area: "21,000 ha",
+                    population: "50,000 habitantes",
+                    rooms: "5,000+ cuartos de hotel",
+                    visitors: "1 millón de turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+                    "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800"
+                ]
+            },
+            {
+                name: "Marina Ixtapa",
+                type: "marina",
+                state: "Guerrero",
+                lat: 17.6700,
+                lng: -101.6500,
+                year: 1980,
+                description: "Marina turística integrada al desarrollo de Ixtapa",
+                details: {
+                    slips: "600 posiciones",
+                    services: "Reparación, combustible, electricidad",
+                    amenities: "Restaurantes, tiendas, club náutico",
+                    capacity: "Embarcaciones hasta 120 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+                ]
+            },
+            {
+                name: "Marina Cabo San Lucas",
+                type: "marina",
+                state: "Baja California Sur",
+                lat: 22.8905,
+                lng: -109.9120,
+                year: 1982,
+                description: "Marina de clase mundial en el extremo sur de Baja California",
+                details: {
+                    slips: "380 posiciones",
+                    services: "Astillero, combustible, electricidad, agua",
+                    amenities: "Centro comercial, restaurantes, galerías",
+                    capacity: "Megayates hasta 200 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+                ]
+            },
+            {
+                name: "Marina Cozumel",
+                type: "marina",
+                state: "Quintana Roo",
+                lat: 20.5083,
+                lng: -86.9458,
+                year: 1990,
+                description: "Marina turística en la isla de Cozumel",
+                details: {
+                    slips: "200 posiciones",
+                    services: "Reparación, combustible, provisiones",
+                    amenities: "Zona comercial, restaurantes",
+                    capacity: "Embarcaciones hasta 150 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800",
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800"
+                ]
+            },
+            {
+                name: "Marina Puerto Los Cabos",
+                type: "marina",
+                state: "Baja California Sur",
+                lat: 23.0500,
+                lng: -109.6900,
+                year: 2006,
+                description: "Marina de lujo con desarrollo residencial integrado",
+                details: {
+                    slips: "450 posiciones",
+                    services: "Astillero completo, combustible, electricidad",
+                    amenities: "Campo de golf, beach club, comercios",
+                    capacity: "Superyates hasta 250 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800",
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800"
+                ]
+            },
+            {
+                name: "Marina Huatulco",
+                type: "marina",
+                state: "Oaxaca",
+                lat: 15.7583,
+                lng: -96.1350,
+                year: 1988,
+                description: "Marina sustentable en Santa Cruz Huatulco",
+                details: {
+                    slips: "120 posiciones",
+                    services: "Reparación, combustible, provisiones",
+                    amenities: "Plaza comercial, restaurantes",
+                    capacity: "Embarcaciones hasta 100 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+                ]
+            },
+            {
+                name: "Playa Espíritu",
+                type: "cip",
+                state: "Sinaloa",
+                lat: 23.2494,
+                lng: -106.4111,
+                year: 2010,
+                description: "Desarrollo turístico residencial sustentable en la costa de Sinaloa",
+                details: {
+                    area: "3,200 ha",
+                    population: "En desarrollo",
+                    rooms: "Planeados 8,000 cuartos",
+                    visitors: "Proyectado 500,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+                    "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800"
+                ]
+            }
+        ];
+
+        let map;
+        let markers = [];
+        let markerClusterGroup;
+        let currentFilter = 'all';
+        let currentYear = 2025;
+        let activeMarker = null;
+        let clusterEnabled = false;
+
+        function initMap() {
+            map = L.map('map').setView([23.6345, -102.5528], 5);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+
+            markerClusterGroup = L.markerClusterGroup({
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true,
+                maxClusterRadius: 80,
+                iconCreateFunction: function(cluster) {
+                    const childCount = cluster.getChildCount();
+                    let c = ' marker-cluster-';
+                    if (childCount < 3) {
+                        c += 'small';
+                    } else if (childCount < 6) {
+                        c += 'medium';
+                    } else {
+                        c += 'large';
+                    }
+                    return new L.DivIcon({
+                        html: '<div><span>' + childCount + '</span></div>',
+                        className: 'marker-cluster' + c,
+                        iconSize: new L.Point(40, 40)
+                    });
+                }
+            });
+
+            renderMarkers();
+            renderSitesList();
+            updateStats();
+        }
+
+        function getMarkerIcon(type, isActive = false) {
+            const colors = {
+                cip: isActive ? '#e74c3c' : '#3498db',
+                marina: isActive ? '#e74c3c' : '#27ae60'
+            };
+
+            const iconHtml = `
+                <div style="
+                    width: 28px;
+                    height: 28px;
+                    background: ${colors[type]};
+                    border: 3px solid white;
+                    border-radius: 50%;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 16px;
+                    transform: ${isActive ? 'scale(1.3)' : 'scale(1)'};
+                    transition: transform 0.3s ease;
+                ">
+                    ${type === 'cip' ? '🏖️' : '⚓'}
+                </div>
+            `;
+
+            return L.divIcon({
+                html: iconHtml,
+                className: '',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -14]
+            });
+        }
+
+        function renderMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            if (clusterEnabled) {
+                markerClusterGroup.clearLayers();
+            }
+            markers = [];
+
+            const filteredSites = sitesData.filter(site => {
+                const matchesFilter = currentFilter === 'all' || site.type === currentFilter;
+                const matchesYear = site.year <= currentYear;
+                return matchesFilter && matchesYear;
+            });
+
+            filteredSites.forEach(site => {
+                const marker = L.marker([site.lat, site.lng], {
+                    icon: getMarkerIcon(site.type, false)
+                });
+
+                const popupContent = `
+                    <div class="info-popup">
+                        <div class="popup-title">${site.name}</div>
+                        <div class="popup-content">
+                            <strong>Tipo:</strong> ${site.type === 'cip' ? 'CIP' : 'Marina Turística'}<br>
+                            <strong>Estado:</strong> ${site.state}<br>
+                            <strong>Año de creación:</strong> ${site.year}<br><br>
+                            <p>${site.description}</p>
+                        </div>
+                        <button class="view-more-btn" onclick="openDetailModal('${site.name}')">Ver detalles completos</button>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent, {
+                    maxWidth: 300,
+                    className: 'custom-popup'
+                });
+
+                marker.on('click', function() {
+                    if (activeMarker && activeMarker !== marker) {
+                        const oldSite = sitesData.find(s => s.lat === activeMarker.getLatLng().lat);
+                        activeMarker.setIcon(getMarkerIcon(oldSite.type, false));
+                    }
+                    marker.setIcon(getMarkerIcon(site.type, true));
+                    activeMarker = marker;
+                    highlightSiteCard(site.name);
+                });
+
+                marker.siteData = site;
+                markers.push(marker);
+
+                if (clusterEnabled) {
+                    markerClusterGroup.addLayer(marker);
+                } else {
+                    marker.addTo(map);
+                }
+            });
+
+            if (clusterEnabled) {
+                map.addLayer(markerClusterGroup);
+            }
+        }
+
+        function renderSitesList() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filteredSites = sitesData.filter(site => {
+                const matchesFilter = currentFilter === 'all' || site.type === currentFilter;
+                const matchesYear = site.year <= currentYear;
+                const matchesSearch = site.name.toLowerCase().includes(searchTerm) || 
+                                     site.state.toLowerCase().includes(searchTerm);
+                return matchesFilter && matchesYear && matchesSearch;
+            });
+
+            const sitesList = document.getElementById('sitesList');
+            sitesList.innerHTML = '';
+
+            filteredSites.forEach(site => {
+                const card = document.createElement('div');
+                card.className = 'site-card';
+                card.setAttribute('data-site', site.name);
+                
+                const carouselHtml = site.images.length > 0 ? `
+                    <div class="card-carousel">
+                        ${site.images.map((img, idx) => `
+                            <img src="${img}" alt="${site.name}" class="${idx === 0 ? 'active' : ''}" onerror="this.src='https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800'">
+                        `).join('')}
+                        ${site.images.length > 1 ? `
+                            <div class="carousel-indicators">
+                                ${site.images.map((_, idx) => `
+                                    <div class="carousel-dot ${idx === 0 ? 'active' : ''}" data-index="${idx}"></div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : '';
+
+                card.innerHTML = `
+                    ${carouselHtml}
+                    <div class="site-header">
+                        <div>
+                            <div class="site-name">${site.name}</div>
+                            <div class="site-state">${site.state}</div>
+                            <div class="site-year">Fundado en ${site.year}</div>
+                        </div>
+                        <div class="site-badge">${site.type === 'cip' ? 'CIP' : 'MARINA'}</div>
+                    </div>
+                    <button class="view-more-btn" onclick="openDetailModal('${site.name}')">Ver más</button>
+                `;
+
+                card.addEventListener('click', function(e) {
+                    if (!e.target.classList.contains('view-more-btn') && 
+                        !e.target.classList.contains('carousel-dot')) {
+                        const marker = markers.find(m => m.siteData.name === site.name);
+                        if (marker) {
+                            map.setView([site.lat, site.lng], 10);
+                            marker.fire('click');
+                            marker.openPopup();
+                        }
+                    }
+                });
+
+                if (site.images.length > 1) {
+                    let currentIndex = 0;
+                    const images = card.querySelectorAll('.card-carousel img');
+                    const dots = card.querySelectorAll('.carousel-dot');
+                    
+                    const rotateCarousel = () => {
+                        images[currentIndex].classList.remove('active');
+                        dots[currentIndex].classList.remove('active');
+                        currentIndex = (currentIndex + 1) % images.length;
+                        images[currentIndex].classList.add('active');
+                        dots[currentIndex].classList.add('active');
+                    };
+
+                    setInterval(rotateCarousel, 4000);
+
+                    dots.forEach((dot, idx) => {
+                        dot.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            images[currentIndex].classList.remove('active');
+                            dots[currentIndex].classList.remove('active');
+                            currentIndex = idx;
+                            images[currentIndex].classList.add('active');
+                            dots[currentIndex].classList.add('active');
+                        });
+                    });
+                }
+
+                sitesList.appendChild(card);
+            });
+        }
+
+        function highlightSiteCard(siteName) {
+            document.querySelectorAll('.site-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            const card = document.querySelector(`[data-site="${siteName}"]`);
+            if (card) {
+                card.classList.add('active');
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function updateStats() {
+            const filteredSites = sitesData.filter(site => {
+                const matchesFilter = currentFilter === 'all' || site.type === currentFilter;
+                const matchesYear = site.year <= currentYear;
+                return matchesFilter && matchesYear;
+            });
+
+            document.getElementById('totalSites').textContent = `${sitesData.length} desarrollos`;
+            document.getElementById('visibleSites').textContent = `${filteredSites.length} visibles`;
+        }
+
+        function openDetailModal(siteName) {
+            const site = sitesData.find(s => s.name === siteName);
+            if (!site) return;
+
+            const modal = document.getElementById('detailModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalCarousel = document.getElementById('modalCarousel');
+            const modalIndicators = document.getElementById('modalIndicators');
+            const modalBody = document.getElementById('modalBody');
+
+            modalTitle.textContent = site.name;
+
+            modalCarousel.innerHTML = `
+                ${site.images.map((img, idx) => `
+                    <img src="${img}" alt="${site.name}" class="${idx === 0 ? 'active' : ''}" onerror="this.src='https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800'">
+                `).join('')}
+                <button class="carousel-nav prev" id="carouselPrev">‹</button>
+                <button class="carousel-nav next" id="carouselNext">›</button>
+            `;
+
+            modalIndicators.innerHTML = site.images.map((_, idx) => `
+                <div class="carousel-dot ${idx === 0 ? 'active' : ''}" data-index="${idx}"></div>
+            `).join('');
+
+            const detailsHtml = Object.entries(site.details).map(([key, value]) => `
+                <div class="modal-info-item">
+                    <div class="modal-info-label">${key}</div>
+                    <div class="modal-info-value">${value}</div>
+                </div>
+            `).join('');
+
+            modalBody.innerHTML = `
+                <div class="modal-section">
+                    <h3>Información General</h3>
+                    <p><strong>Estado:</strong> ${site.state}</p>
+                    <p><strong>Tipo:</strong> ${site.type === 'cip' ? 'Centro Integralmente Planeado (CIP)' : 'Marina Turística'}</p>
+                    <p><strong>Año de creación:</strong> ${site.year}</p>
+                </div>
+                <div class="modal-section">
+                    <h3>Descripción</h3>
+                    <p>${site.description}</p>
+                </div>
+                <div class="modal-section">
+                    <h3>Datos Clave</h3>
+                    <div class="modal-info-grid">
+                        ${detailsHtml}
+                    </div>
+                </div>
+            `;
+
+            modal.classList.add('active');
+
+            let currentImageIndex = 0;
+            const images = modalCarousel.querySelectorAll('img');
+            const dots = modalIndicators.querySelectorAll('.carousel-dot');
+
+            function showImage(index) {
+                images.forEach((img, i) => {
+                    img.classList.toggle('active', i === index);
+                });
+                dots.forEach((dot, i) => {
+                    dot.classList.toggle('active', i === index);
+                });
+                currentImageIndex = index;
+            }
+
+            document.getElementById('carouselPrev').addEventListener('click', () => {
+                const newIndex = (currentImageIndex - 1 + images.length) % images.length;
+                showImage(newIndex);
+            });
+
+            document.getElementById('carouselNext').addEventListener('click', () => {
+                const newIndex = (currentImageIndex + 1) % images.length;
+                showImage(newIndex);
+            });
+
+            dots.forEach((dot, idx) => {
+                dot.addEventListener('click', () => showImage(idx));
+            });
+        }
+
+        document.getElementById('modalClose').addEventListener('click', () => {
+            document.getElementById('detailModal').classList.remove('active');
+        });
+
+        document.getElementById('detailModal').addEventListener('click', (e) => {
+            if (e.target.id === 'detailModal') {
+                document.getElementById('detailModal').classList.remove('active');
+            }
+        });
+
+        document.getElementById('timelineSlider').addEventListener('input', function() {
+            currentYear = parseInt(this.value);
+            document.getElementById('currentYear').textContent = currentYear;
+            renderMarkers();
+            renderSitesList();
+            updateStats();
+        });
+
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.getAttribute('data-filter');
+                renderMarkers();
+                renderSitesList();
+                updateStats();
+            });
+        });
+
+        document.getElementById('searchInput').addEventListener('input', function() {
+            renderSitesList();
+        });
+
+        document.getElementById('toggleSidebar').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = this;
+            const icon = document.getElementById('toggleIcon');
+            
+            sidebar.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            icon.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+        });
+
+        document.getElementById('resetView').addEventListener('click', function() {
+            map.setView([23.6345, -102.5528], 5);
+            if (activeMarker) {
+                const oldSite = sitesData.find(s => s.lat === activeMarker.getLatLng().lat);
+                activeMarker.setIcon(getMarkerIcon(oldSite.type, false));
+                activeMarker = null;
+            }
+            document.querySelectorAll('.site-card').forEach(card => card.classList.remove('active'));
+        });
+
+        document.getElementById('clusterToggle').addEventListener('click', function() {
+            clusterEnabled = !clusterEnabled;
+            this.textContent = clusterEnabled ? '📍 Desagrupar Sitios' : '📍 Agrupar Sitios';
+            renderMarkers();
+        });
+
+        window.addEventListener('load', initMap);
+    </script>
+</body>
+</html>
+
+        .popup-list li::before {
+            content: '●';
+            position: absolute;
+            left: 0;
+            color: var(--accent-color);
+            font-size: 14px;
+        }
+
+        .popup-image {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin: 12px 0;
+        }
+
+        .popup-footer {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-light);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        /* Scrollbar personalizado */
+        .sites-list::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .sites-list::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-radius: 4px;
+        }
+
+        .sites-list::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+            transition: background 0.3s ease;
+        }
+
+        .sites-list::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        .modal-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .modal-content::-webkit-scrollbar-track {
+            background: var(--bg-color);
+            border-radius: 4px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+
+        .modal-content::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+                width: 100%;
+                position: absolute;
+                height: 100vh;
+                z-index: 1002;
+            }
+
+                transform: translateX(-100%);
+            }
+
+            .toggle-sidebar {
+                left: 20px;
+            }
+
+            .toggle-sidebar.collapsed {
+                left: 20px;
+            }
+
+            .map-legend {
+                bottom: 20px;
+                right: 10px;
+                max-width: 200px;
+            }
+
+            .map-controls {
+                top: 80px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .modal-content {
+                max-width: 95%;
+                max-height: 90vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <aside id="sidebar">
+            <header class="header">
+                <div class="header-content">
+                    <h1>Desarrollos FONATUR</h1>
+                    <p>Centros Integralmente Planeados y Marinas Turísticas de México</p>
+                    <div class="header-stats">
+                        <div class="header-stat">
+                            <span class="header-stat-icon">📊</span>
+                            <span id="totalSites">0 desarrollos</span>
+                        </div>
+                        <div class="header-stat">
+                            <span class="header-stat-icon">🗺️</span>
+                            <span id="visibleSites">0 visibles</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="timeline-control">
+                <label class="timeline-label">Línea de Tiempo</label>
+                <input type="range" class="timeline-slider" id="timelineSlider" min="1970" max="2025" value="2025" step="1">
+                <div class="timeline-years">
+                    <span>1970</span>
+                    <span>1985</span>
+                    <span>2000</span>
+                    <span>2015</span>
+                    <span>2025</span>
+                </div>
+                <div class="timeline-current">
+                    Año: <span id="currentYear">2025</span>
+                </div>
+            </div>
+
+            <div class="filter-chips">
+                <button class="filter-chip active" data-filter="all">Todos</button>
+                <button class="filter-chip" data-filter="cip">CIP</button>
+                <button class="filter-chip" data-filter="marina">Marinas</button>
+            </div>
+
+            <div class="search-container">
+                <div class="search-box">
+                    <input type="text" class="search-input" id="searchInput" placeholder="Buscar por nombre o ubicación...">
+                    <span class="search-icon">🔍</span>
+                </div>
+            </div>
+
+            <div class="sites-list" id="sitesList"></div>
+        </aside>
+
+        <main id="map"></main>
+
+        <button class="toggle-sidebar" id="toggleSidebar">
+            <span id="toggleIcon">◀</span>
+        </button>
+
+        <div class="map-legend">
+            <div class="legend-title">Leyenda</div>
+            <div class="legend-item">
+                <div class="legend-symbol cip"></div>
+                <span>CIP - Centro Integralmente Planeado</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol marina"></div>
+                <span>Marina Turística</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-symbol active"></div>
+                <span>Seleccionado</span>
+            </div>
+        </div>
+
+        <div class="map-controls">
+            <button class="control-button" id="resetView">🏠 Vista Inicial</button>
+            <button class="control-button" id="clusterToggle">📍 Agrupar Sitios</button>
+        </div>
+    </div>
+
+    <div class="detail-modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle"></h2>
+                <button class="modal-close" id="modalClose">×</button>
+            </div>
+            <div class="modal-carousel" id="modalCarousel">
+                <button class="carousel-nav prev" id="carouselPrev">‹</button>
+                <button class="carousel-nav next" id="carouselNext">›</button>
+            </div>
+            <div class="carousel-indicators" id="modalIndicators"></div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    
+    <script>
+        const sitesData = [
+            {
+                name: "Cancún",
+                type: "cip",
+                state: "Quintana Roo",
+                lat: 21.1619,
+                lng: -86.8515,
+                year: 1974,
+                description: "Primer CIP de FONATUR, transformó una isla de pescadores en el principal destino turístico de México",
+                details: {
+                    area: "1,200 ha",
+                    population: "900,000+ habitantes",
+                    rooms: "45,000+ cuartos de hotel",
+                    visitors: "6 millones de turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1568402102990-bc541580b59f?w=800",
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800",
+                    "https://images.unsplash.com/photo-1512813498716-47110fdbd281?w=800"
+                ]
+            },
+            {
+                name: "Ixtapa",
+                type: "cip",
+                state: "Guerrero",
+                lat: 17.6519,
+                lng: -101.6346,
+                year: 1976,
+                description: "Desarrollo turístico planificado en la costa del Pacífico mexicano",
+                details: {
+                    area: "1,800 ha",
+                    population: "45,000 habitantes",
+                    rooms: "5,000+ cuartos de hotel",
+                    visitors: "500,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1582610285985-a42d3d8c7041?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+            },
+            {
+                name: "Los Cabos",
+                type: "cip",
+                state: "Baja California Sur",
+                lat: 22.8905,
+                lng: -109.9167,
+                year: 1976,
+                description: "Desarrollo turístico de lujo en el extremo sur de la península de Baja California",
+                details: {
+                    area: "2,300 ha",
+                    population: "350,000+ habitantes",
+                    rooms: "15,000+ cuartos de hotel",
+                    visitors: "3 millones de turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800",
+                    "https://images.unsplash.com/photo-1514282401047-d79a71a590e8?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800"
+                ]
+            },
+            {
+                name: "Loreto",
+                type: "cip",
+                state: "Baja California Sur",
+                lat: 26.0129,
+                lng: -111.3486,
+                year: 1976,
+                description: "Centro turístico con enfoque en ecoturismo y turismo cultural",
+                details: {
+                    area: "800 ha",
+                    population: "20,000 habitantes",
+                    rooms: "1,200 cuartos de hotel",
+                    visitors: "150,000 turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+                    "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800"
+                ]
+            },
+            {
+                name: "Huatulco",
+                type: "cip",
+                state: "Oaxaca",
+                lat: 15.7650,
+                lng: -96.1297,
+                year: 1984,
+                description: "Desarrollo sustentable con nueve bahías y 36 playas en la costa de Oaxaca",
+                details: {
+                    area: "21,000 ha",
+                    population: "50,000 habitantes",
+                    rooms: "5,000+ cuartos de hotel",
+                    visitors: "1 millón de turistas/año"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1583007871397-c2cd1322f458?w=800",
+                    "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800",
+                    "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800"
+                ]
+            },
+            {
+                name: "Marina Ixtapa",
+                type: "marina",
+                state: "Guerrero",
+                lat: 17.6700,
+                lng: -101.6500,
+                year: 1980,
+                description: "Marina turística integrada al desarrollo de Ixtapa",
+                details: {
+                    slips: "600 posiciones",
+                    services: "Reparación, combustible, electricidad",
+                    amenities: "Restaurantes, tiendas, club náutico",
+                    capacity: "Embarcaciones hasta 120 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+                ]
+            },
+            {
+                name: "Marina Cabo San Lucas",
+                type: "marina",
+                state: "Baja California Sur",
+                lat: 22.8905,
+                lng: -109.9120,
+                year: 1982,
+                description: "Marina de clase mundial en el extremo sur de Baja California",
+                details: {
+                    slips: "380 posiciones",
+                    services: "Astillero, combustible, electricidad, agua",
+                    amenities: "Centro comercial, restaurantes, galerías",
+                    capacity: "Megayates hasta 200 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+                ]
+            },
+            {
+                name: "Marina Cozumel",
+                type: "marina",
+                state: "Quintana Roo",
+                lat: 20.5083,
+                lng: -86.9458,
+                year: 1990,
+                description: "Marina turística en la isla de Cozumel",
+                details: {
+                    slips: "200 posiciones",
+                    services: "Reparación, combustible, provisiones",
+                    amenities: "Zona comercial, restaurantes",
+                    capacity: "Embarcaciones hasta 150 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800",
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800"
+                ]
+            },
+            {
+                name: "Marina Puerto Los Cabos",
+                type: "marina",
+                state: "Baja California Sur",
+                lat: 23.0500,
+                lng: -109.6900,
+                year: 2006,
+                description: "Marina de lujo con desarrollo residencial integrado",
+                details: {
+                    slips: "450 posiciones",
+                    services: "Astillero completo, combustible, electricidad",
+                    amenities: "Campo de golf, beach club, comercios",
+                    capacity: "Superyates hasta 250 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1567899378494-47b22a2ae96a?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800",
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800"
+                ]
+            },
+            {
+                name: "Marina Huatulco",
+                type: "marina",
+                state: "Oaxaca",
+                lat: 15.7583,
+                lng: -96.1350,
+                year: 1988,
+                description: "Marina sustentable en Santa Cruz Huatulco",
+                details: {
+                    slips: "120 posiciones",
+                    services: "Reparación, combustible, provisiones",
+                    amenities: "Plaza comercial, restaurantes",
+                    capacity: "Embarcaciones hasta 100 pies"
+                },
+                images: [
+                    "https://images.unsplash.com/photo-1540946485063-a40da27545f8?w=800",
+                    "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+                ]
+            }
+        ];
+
+        let map;
+        let markers = [];
+        let markerClusterGroup;
+        let currentFilter = 'all';
+        let currentYear = 2025;
+        let activeMarker = null;
+        let clusterEnabled = false;
+
+        function initMap() {
+            map = L.map('map').setView([23.6345, -102.5528], 5);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd',
+                maxZoom: 20
+            }).addTo(map);
+
+            markerClusterGroup = L.markerClusterGroup({
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true,
+                maxClusterRadius: 80,
+                iconCreateFunction: function(cluster) {
+                    const childCount = cluster.getChildCount();
+                    let c = ' marker-cluster-';
+                    if (childCount < 3) {
+                        c += 'small';
+                    } else if (childCount < 6) {
+                        c += 'medium';
+                    } else {
+                        c += 'large';
+                    }
+                    return new L.DivIcon({
+                        html: '<div><span>' + childCount + '</span></div>',
+                        className: 'marker-cluster' + c,
+                        iconSize: new L.Point(40, 40)
+                    });
+                }
+            });
+
+            renderMarkers();
+            renderSitesList();
+            updateStats();
+        }
+
+        function getMarkerIcon(type, isActive = false) {
+            const colors = {
+                cip: isActive ? '#e74c3c' : '#3498db',
+                marina: isActive ? '#e74c3c' : '#27ae60'
+            };
+
+            const iconHtml = `
+                <div style="
+                    width: 28px;
+                    height: 28px;
+                    background: ${colors[type]};
+                    border: 3px solid white;
+                    border-radius: 50%;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 16px;
+                    transform: ${isActive ? 'scale(1.3)' : 'scale(1)'};
+                    transition: transform 0.3s ease;
+                ">
+                    ${type === 'cip' ? '🏖️' : '⚓'}
+                </div>
+            `;
+
+            return L.divIcon({
+                html: iconHtml,
+                className: '',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+                popupAnchor: [0, -14]
+            });
+        }
+
+        function renderMarkers() {
+            markers.forEach(marker => map.removeLayer(marker));
+            if (clusterEnabled) {
+                markerClusterGroup.clearLayers();
+            }
+            markers = [];
+
+            const filteredSites = sitesData.filter(site => {
+                const matchesFilter = currentFilter === 'all' || site.type === currentFilter;
+                const matchesYear = site.year <= currentYear;
+                return matchesFilter && matchesYear;
+            });
+
+            filteredSites.forEach(site => {
+                const marker = L.marker([site.lat, site.lng], {
+                    icon: getMarkerIcon(site.type, false)
+                });
+
+                const popupContent = `
+                    <div class="info-popup">
+                        <div class="popup-title">${site.name}</div>
+                        <div class="popup-content">
+                            <strong>Tipo:</strong> ${site.type === 'cip' ? 'CIP' : 'Marina Turística'}<br>
+                            <strong>Estado:</strong> ${site.state}<br>
+                            <strong>Año de creación:</strong> ${site.year}<br><br>
+                            <p>${site.description}</p>
+                        </div>
+                        <button class="view-more-btn" onclick="openDetailModal('${site.name}')">Ver detalles completos</button>
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent, {
+                    maxWidth: 300,
+                    className: 'custom-popup'
+                });
+
+                marker.on('click', function() {
+                    if (activeMarker && activeMarker !== marker) {
+                        const oldSite = sitesData.find(s => s.lat === activeMarker.getLatLng().lat);
+                        activeMarker.setIcon(getMarkerIcon(oldSite.type, false));
+                    }
+                    marker.setIcon(getMarkerIcon(site.type, true));
+                    activeMarker = marker;
+                    highlightSiteCard(site.name);
+                });
+
+                marker.siteData = site;
+                markers.push(marker);
+
+                if (clusterEnabled) {
+                    markerClusterGroup.addLayer(marker);
+                } else {
+                    marker.addTo(map);
+                }
+            });
+
+            if (clusterEnabled) {
+                map.addLayer(markerClusterGroup);
+            }
+        }
+
+        function renderSitesList() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const filteredSites = sitesData.filter(site => {
+                const matchesFilter = currentFilter === 'all' || site.type === currentFilter;
+                const matchesYear = site.year <= currentYear;
+                const matchesSearch = site.name.toLowerCase().includes(searchTerm) || 
+                                     site.state.toLowerCase().includes(searchTerm);
+                return matchesFilter && matchesYear && matchesSearch;
+            });
+
+            const sitesList = document.getElementById('sitesList');
+            sitesList.innerHTML = '';
+
+            filteredSites.forEach(site => {
+                const card = document.createElement('div');
+                card.className = 'site-card';
+                card.setAttribute('data-site', site.name);
+                
+                const carouselHtml = site.images.length > 0 ? `
+                    <div class="card-carousel">
+                        ${site.images.map((img, idx) => `
+                            <img src="${img}" alt="${site.name}" class="${idx === 0 ? 'active' : ''}" onerror="this.src='https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800'">
+                        `).join('')}
+                        ${site.images.length > 1 ? `
+                            <div class="carousel-indicators">
+                                ${site.images.map((_, idx) => `
+                                    <div class="carousel-dot ${idx === 0 ? 'active' : ''}" data-index="${idx}"></div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                ` : '';
+
+                card.innerHTML = `
+                    ${carouselHtml}
+                    <div class="site-header">
+                        <div>
+                            <div class="site-name">${site.name}</div>
+                            <div class="site-state">${site.state}</div>
+                            <div class="site-year">Fundado en ${site.year}</div>
+                        </div>
+                        <div class="site-badge">${site.type === 'cip' ? 'CIP' : 'MARINA'}</div>
+                    </div>
+                    <button class="view-more-btn" onclick="openDetailModal('${site.name}')">Ver más</button>
+                `;
+
+                card.addEventListener('click', function(e) {
+                    if (!e.target.classList.contains('view-more-btn') && 
+                        !e.target.classList.contains('carousel-dot')) {
+                        const marker = markers.find(m => m.siteData.name === site.name);
+                        if (marker) {
+                            map.setView([site.lat, site.lng], 10);
+                            marker.fire('click');
+                            marker.openPopup();
+                        }
+                    }
+                });
+
+                if (site.images.length > 1) {
+                    let currentIndex = 0;
+                    const images = card.querySelectorAll('.card-carousel img');
+                    const dots = card.querySelectorAll('.carousel-dot');
+                    
+                    const rotateCarousel = () => {
+                        images[currentIndex].classList.remove('active');
+                        dots[currentIndex].classList.remove('active');
+                        currentIndex = (currentIndex + 1) % images.length;
+                        images[currentIndex].classList.add('active');
+                        dots[currentIndex].classList.add('active');
+                    };
+
+                    setInterval(rotateCarousel, 4000);
+
+                    dots.forEach((dot, idx) => {
+                        dot.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            images[currentIndex].classList.remove('active');
+                            dots[currentIndex].classList.remove('active');
+                            currentIndex = idx;
+                            images[currentIndex].classList.add('active');
+                            dots[currentIndex].classList.add('active');
+                        });
+                    });
+                }
+
+                sitesList.appendChild(card);
+            });
+        }
+
+        function highlightSiteCard(siteName) {
+            document.querySelectorAll('.site-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            const card = document.querySelector(`[data-site="${siteName}"]`);
+            if (card) {
+                card.classList.add('active');
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function updateStats() {
+            const filteredSites = sitesData.filter(site => {
+                const matchesFilter = currentFilter === 'all' || site.type === currentFilter;
+                const matchesYear = site.year <= currentYear;
+                return matchesFilter && matchesYear;
+            });
+
+            document.getElementById('totalSites').textContent = `${sitesData.length} desarrollos`;
+            document.getElementById('visibleSites').textContent = `${filteredSites.length} visibles`;
+        }
+
+        function openDetailModal(siteName) {
+            const site = sitesData.find(s => s.name === siteName);
+            if (!site) return;
+
+            const modal = document.getElementById('detailModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalCarousel = document.getElementById('modalCarousel');
+            const modalIndicators = document.getElementById('modalIndicators');
+            const modalBody = document.getElementById('modalBody');
+
+            modalTitle.textContent = site.name;
+
+            modalCarousel.innerHTML = `
+                ${site.images.map((img, idx) => `
+                    <img src="${img}" alt="${site.name}" class="${idx === 0 ? 'active' : ''}" onerror="this.src='https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800'">
+                `).join('')}
+                <button class="carousel-nav prev" id="carouselPrev">‹</button>
+                <button class="carousel-nav next" id="carouselNext">›</button>
+            `;
+
+            modalIndicators.innerHTML = site.images.map((_, idx) => `
+                <div class="carousel-dot ${idx === 0 ? 'active' : ''}" data-index="${idx}"></div>
+            `).join('');
+
+            const detailsHtml = Object.entries(site.details).map(([key, value]) => `
+                <div class="modal-info-item">
+                    <div class="modal-info-label">${key}</div>
+                    <div class="modal-info-value">${value}</div>
+                </div>
+            `).join('');
+
+            modalBody.innerHTML = `
+                <div class="modal-section">
+                    <h3>Información General</h3>
+                    <p><strong>Estado:</strong> ${site.state}</p>
+                    <p><strong>Tipo:</strong> ${site.type === 'cip' ? 'Centro Integralmente Planeado (CIP)' : 'Marina Turística'}</p>
+                    <p><strong>Año de creación:</strong> ${site.year}</p>
+                </div>
+                <div class="modal-section">
+                    <h3>Descripción</h3>
+                    <p>${site.description}</p>
+                </div>
+                <div class="modal-section">
+                    <h3>Datos Clave</h3>
+                    <div class="modal-info-grid">
+                        ${detailsHtml}
+                    </div>
+                </div>
+            `;
+
+            modal.classList.add('active');
+
+            let currentImageIndex = 0;
+            const images = modalCarousel.querySelectorAll('img');
+            const dots = modalIndicators.querySelectorAll('.carousel-dot');
+
+            function showImage(index) {
+                images.forEach((img, i) => {
+                    img.classList.toggle('active', i === index);
+                });
+                dots.forEach((dot, i) => {
+                    dot.classList.toggle('active', i === index);
+                });
+                currentImageIndex = index;
+            }
+
+            document.getElementById('carouselPrev').addEventListener('click', () => {
+                const newIndex = (currentImageIndex - 1 + images.length) % images.length;
+                showImage(newIndex);
+            });
+
+            document.getElementById('carouselNext').addEventListener('click', () => {
+                const newIndex = (currentImageIndex + 1) % images.length;
+                showImage(newIndex);
+            });
+
+            dots.forEach((dot, idx) => {
+                dot.addEventListener('click', () => showImage(idx));
+            });
+        }
+
+        document.getElementById('modalClose').addEventListener('click', () => {
+            document.getElementById('detailModal').classList.remove('active');
+        });
+
+        document.getElementById('detailModal').addEventListener('click', (e) => {
+            if (e.target.id === 'detailModal') {
+                document.getElementById('detailModal').classList.remove('active');
+            }
+        });
+
+        document.getElementById('timelineSlider').addEventListener('input', function() {
+            currentYear = parseInt(this.value);
+            document.getElementById('currentYear').textContent = currentYear;
+            renderMarkers();
+            renderSitesList();
+            updateStats();
+        });
+
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.getAttribute('data-filter');
+                renderMarkers();
+                renderSitesList();
+                updateStats();
+            });
+        });
+
+        document.getElementById('searchInput').addEventListener('input', function() {
+            renderSitesList();
+        });
+
+        document.getElementById('toggleSidebar').addEventListener('click', function() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = this;
+            const icon = document.getElementById('toggleIcon');
+            
+            sidebar.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            icon.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+        });
+
+        document.getElementById('resetView').addEventListener('click', function() {
+            map.setView([23.6345, -102.5528], 5);
+            if (activeMarker) {
+                const oldSite = sitesData.find(s => s.lat === activeMarker.getLatLng().lat);
+                activeMarker.setIcon(getMarkerIcon(oldSite.type, false));
+                activeMarker = null;
+            }
+            document.querySelectorAll('.site-card').forEach(card => card.classList.remove('active'));
+        });
+
+        document.getElementById('clusterToggle').addEventListener('click', function() {
+            clusterEnabled = !clusterEnabled;
+            this.textContent = clusterEnabled ? '📍 Desagrupar Sitios' : '📍 Agrupar Sitios';
+            renderMarkers();
+        });
+
+        window.addEventListener('load', initMap);
+    </script>
+</body>
+</html>0px;
+            top: 12px;
+        }
+
+        .popup-footer {
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-color);
+            font-size: 11px;
+            color: #9ca3af;
+        }
+
+        .leaflet-popup-content-wrapper {
+            border-radius: 12px;
+            box-shadow: var(--shadow-lg);
+            border: 2px solid var(--border-color);
+        }
+
+        .leaflet-popup-tip {
+            box-shadow: var(--shadow-sm);
+        }
+
+        .custom-marker {
+            background: linear-gradient(135deg, var(--highlight-color) 0%, #2980b9 100%);
+            border: 4px solid white;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+        }
+
+        .custom-marker.marina {
+            background: linear-gradient(135deg, var(--success-color) 0%, #1e8449 100%);
+        }
+
+        .custom-marker.active {
+            background: linear-gradient(135deg, var(--accent-color) 0%, #c0392b 100%);
+            transform: scale(1.4);
+            animation: pulse 2s infinite;
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .custom-marker.filtered {
+            opacity: 0.3;
+            filter: grayscale(80%);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.8);
+            }
+            50% {
+                box-shadow: 0 0 0 15px rgba(231, 76, 60, 0);
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        @media (max-width: 768px) {
+            #sidebar {
+                width: 100%;
+                max-width: 380px;
+            }
+
+            .toggle-sidebar {
+                left: 20px;
+            }
+
+            .toggle-sidebar.collapsed {
+                left: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- SIDEBAR: Panel lateral con controles y lista -->
+        <div id="sidebar">
+            <!-- Header con información del proyecto -->
+            <div class="header">
+                <div class="header-content">
+                    <h1>Desarrollos FONATUR</h1>
+                    <p>Centros Integralmente Planeados en México</p>
+                    <div class="header-stats">
+                        <div class="header-stat">
+                            <span class="header-stat-icon">🏖️</span>
+                            <span>10 Desarrollos</span>
+                        </div>
+                        <div class="header-stat">
+                            <span class="header-stat-icon">📅</span>
+                            <span>1970-2026</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Control de búsqueda -->
+            <div class="search-container">
+                <div class="search-box">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Buscar por nombre, estado o tipo...">
+                    <span class="search-icon">🔍</span>
+                </div>
+            </div>
+
+            <!-- Timeline slider -->
+            <div class="timeline-control">
+                <label class="timeline-label">Filtrar por año</label>
+                <input type="range" id="timelineSlider" class="timeline-slider" min="1970" max="2026" value="2026" step="1">
+                <div class="timeline-years">
+                    <span>1970</span>
+                    <span>1985</span>
+                    <span>2000</span>
+                    <span>2015</span>
+                    <span>2026</span>
+                </div>
+                <div class="timeline-current" id="timelineDisplay">Mostrando: Todos los años</div>
+            </div>
+
+            <!-- Filtros por tipo -->
+            <div class="filter-chips">
+                <button class="filter-chip active" data-type="all">Todos</button>
+                <button class="filter-chip" data-type="CIP">CIP</button>
+                <button class="filter-chip" data-type="Marina">Marinas</button>
+            </div>
+            
+            <!-- Lista de desarrollos -->
+            <div class="sites-list" id="sitesList"></div>
+        </div>
+
+        <!-- Botón de toggle -->
+        <button class="toggle-sidebar" id="toggleBtn" onclick="toggleSidebar()">
+            <span id="toggleIcon">☰</span>
+        </button>
+        
+        <!-- Mapa principal -->
+        <div id="map"></div>
+
+        <!-- Controles del mapa -->
+        <div class="map-controls">
+            <button class="control-button" id="resetViewBtn" onclick="resetMapView()" title="Vista general">
+                <span>🌎</span>
+                <span>Vista General</span>
+            </button>
+            <button class="control-button" id="toggleBasemapBtn" onclick="toggleBasemap()" title="Cambiar mapa base">
+                <span id="basemapIcon">🛰️</span>
+                <span id="basemapLabel">Satélite</span>
+            </button>
+            <div class="map-stats" id="mapStats">
+                <div class="stat-item">
+                    <div class="stat-value" id="visibleCount">10</div>
+                    <div class="stat-label">Visibles</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="selectedCount">0</div>
+                    <div class="stat-label">Seleccionado</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de detalles -->
+        <div class="detail-modal" id="detailModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button class="modal-close" onclick="closeDetailModal()">×</button>
+                    <h2 id="modalTitle"></h2>
+                    <p id="modalSubtitle"></p>
+                </div>
+                <div class="modal-carousel" id="modalCarousel">
+                    <!-- Imágenes dinámicas -->
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Contenido dinámico -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Leyenda del mapa -->
+        <div class="map-legend">
+            <div class="legend-title">Simbología</div>
+            <div class="legend-item">
+                <span class="legend-symbol cip"></span>
+                <span>Centro Integralmente Planeado (CIP)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-symbol marina"></span>
+                <span>Marina Turística</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-symbol active"></span>
+                <span>Seleccionado / Activo</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        /* ============================================
+           ESTADO DE LA APLICACIÓN (State Management)
+        ============================================ */
+        const AppState = {
+            activeMarker: null,
+            currentFilter: 'all',
+            currentYear: 2026,
+            visibleSites: [],
+            searchTerm: ''
+        };
+
+        /* ============================================
+           DATOS DE LOS DESARROLLOS FONATUR
+        ============================================ */
+        const fonaturaData = [
+            {
+                id: 1,
+                name: 'Cancún',
+                state: 'Quintana Roo',
+                year: 1970,
+                type: 'CIP',
+                lat: 21.1619,
+                lng: -86.8515,
+                info: [
+                    'Primer CIP desarrollado por FONATUR',
+                    'Destino turístico internacional líder',
+                    'Más de 30,000 cuartos de hotel',
+                    'Aeropuerto internacional con conexiones globales',
+                    'Zona Hotelera de 22.5 km de playas'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1568402102990-bc541580b59f?w=800',
+                    'https://images.unsplash.com/photo-1606317321160-1da6e4d40e41?w=800',
+                    'https://images.unsplash.com/photo-1583057457940-3ad5e8b5e3ad?w=800'
+                ],
+                details: {
+                    superficie: '12,700 hectáreas',
+                    poblacion: '900,000 habitantes',
+                    cuartosHotel: '35,000+',
+                    visitantesAnuales: '6.5 millones'
+                }
+            },
+            {
+                id: 2,
+                name: 'Ixtapa-Zihuatanejo',
+                state: 'Guerrero',
+                year: 1974,
+                type: 'CIP',
+                lat: 17.6419,
+                lng: -101.5519,
+                info: [
+                    'Segundo CIP de México',
+                    'Combina modernidad con tradición pesquera',
+                    'Playa La Ropa y Playa Las Gatas',
+                    'Campo de golf de clase mundial',
+                    '3.5 km de zona hotelera'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1602002418082-a4443e081dd1?w=800',
+                    'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+                    'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800'
+                ],
+                details: {
+                    superficie: '2,100 hectáreas',
+                    poblacion: '120,000 habitantes',
+                    cuartosHotel: '6,000+',
+                    visitantesAnuales: '1.2 millones'
+                }
+            },
+            {
+                id: 3,
+                name: 'Los Cabos',
+                state: 'Baja California Sur',
+                year: 1976,
+                type: 'CIP',
+                lat: 22.8905,
+                lng: -109.9167,
+                info: [
+                    'Tercer CIP de FONATUR',
+                    'Corredor turístico San José-Cabo San Lucas',
+                    'Destino premium de golf y pesca deportiva',
+                    'El Arco: ícono natural reconocido',
+                    'Marina de clase mundial'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1573843981267-be1999ff37cd?w=800',
+                    'https://images.unsplash.com/photo-1580655653885-65763b2597d0?w=800',
+                    'https://images.unsplash.com/photo-1621277224630-81d9af65e40f?w=800'
+                ],
+                details: {
+                    superficie: '3,500 hectáreas',
+                    poblacion: '350,000 habitantes',
+                    cuartosHotel: '15,000+',
+                    visitantesAnuales: '3.5 millones'
+                }
+            },
+            {
+                id: 4,
+                name: 'Loreto',
+                state: 'Baja California Sur',
+                year: 1980,
+                type: 'CIP',
+                lat: 26.0129,
+                lng: -111.3485,
+                info: [
+                    'CIP enfocado en turismo sustentable',
+                    'Acceso al Parque Nacional Marino',
+                    'Misión histórica de 1697',
+                    'Pesca deportiva y ecoturismo',
+                    'Nopoló: desarrollo residencial-turístico'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1542224566-6e85f2e6772f?w=800',
+                    'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
+                    'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=800'
+                ],
+                details: {
+                    superficie: '8,000 hectáreas',
+                    poblacion: '18,000 habitantes',
+                    cuartosHotel: '2,500+',
+                    visitantesAnuales: '500,000'
+                }
+            },
+            {
+                id: 5,
+                name: 'Huatulco',
+                state: 'Oaxaca',
+                year: 1985,
+                type: 'CIP',
+                lat: 15.7650,
+                lng: -96.2627,
+                info: [
+                    'Nueve bahías y 36 playas',
+                    'Primer CIP con certificación EarthCheck',
+                    'Reserva ecológica de 11,890 hectáreas',
+                    'Parque Nacional Huatulco',
+                    'Puerto Escondido cercano para surf'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1590523277543-a94d2e4eb00b?w=800',
+                    'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800',
+                    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800'
+                ],
+                details: {
+                    superficie: '21,000 hectáreas',
+                    poblacion: '50,000 habitantes',
+                    cuartosHotel: '5,000+',
+                    visitantesAnuales: '1.5 millones'
+                }
+            },
+            {
+                id: 6,
+                name: 'Bahía de Banderas (Nayarit)',
+                state: 'Nayarit',
+                year: 2004,
+                type: 'CIP',
+                lat: 20.7004,
+                lng: -105.3700,
+                info: [
+                    'Riviera Nayarit en desarrollo',
+                    'PTI Litibú con inversión de IBEROSTAR',
+                    'PTI Costa Capomo en construcción',
+                    'Punta de Mita: destino de lujo',
+                    'Conexión con Puerto Vallarta'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800',
+                    'https://images.unsplash.com/photo-1540202404-a2f274e8fe07?w=800',
+                    'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800'
+                ],
+                details: {
+                    superficie: '10,000 hectáreas',
+                    poblacion: '80,000 habitantes',
+                    cuartosHotel: '8,000+',
+                    visitantesAnuales: '2 millones'
+                }
+            },
+            {
+                id: 7,
+                name: 'Playa Espíritu',
+                state: 'Sinaloa',
+                year: 2004,
+                type: 'CIP',
+                lat: 22.8333,
+                lng: -105.9667,
+                info: [
+                    'Primer destino 100% sustentable de FONATUR',
+                    '2,381 hectáreas de desarrollo',
+                    '12 km de playa virgen',
+                    'Ubicado en Escuinapa',
+                    'Enfoque en turismo ecológico'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800',
+                    'https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?w=800',
+                    'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=800'
+                ],
+                details: {
+                    superficie: '2,381 hectáreas',
+                    poblacion: 'En desarrollo',
+                    cuartosHotel: '1,500 proyectados',
+                    visitantesAnuales: 'En proyección'
+                }
+            },
+            {
+                id: 8,
+                name: 'Marina Cozumel',
+                state: 'Quintana Roo',
+                year: 2010,
+                type: 'Marina',
+                lat: 20.5083,
+                lng: -86.9458,
+                info: [
+                    'Marina turística de clase mundial',
+                    'Capacidad para embarcaciones de lujo',
+                    'Arrecifes de coral cercanos',
+                    'Cruceros internacionales',
+                    'Turismo de buceo especializado'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800',
+                    'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800',
+                    'https://images.unsplash.com/photo-1583417319070-4a69db38a482?w=800'
+                ],
+                details: {
+                    superficie: '150 hectáreas',
+                    poblacion: '100,000 habitantes (Cozumel)',
+                    amarres: '250+',
+                    visitantesAnuales: '4 millones (isla)'
+                }
+            },
+            {
+                id: 9,
+                name: 'Acapulco',
+                state: 'Guerrero',
+                year: 2025,
+                type: 'CIP',
+                lat: 16.8631,
+                lng: -99.8825,
+                info: [
+                    'Renovación integral del destino tradicional',
+                    'Proyecto de recuperación post-huracán Otis',
+                    'Modernización de infraestructura turística',
+                    'Bahía de Santa Lucía icónica',
+                    'Integración de turismo sustentable'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1602002418082-a4443e081dd1?w=800',
+                    'https://images.unsplash.com/photo-1512813195386-6cf811ad3542?w=800',
+                    'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800'
+                ],
+                details: {
+                    superficie: '15,000 hectáreas',
+                    poblacion: '850,000 habitantes',
+                    cuartosHotel: '18,000+',
+                    visitantesAnuales: '8 millones proyectados'
+                }
+            },
+            {
+                id: 10,
+                name: 'Compostela',
+                state: 'Nayarit',
+                year: 2026,
+                type: 'CIP',
+                lat: 21.2333,
+                lng: -104.9000,
+                info: [
+                    'Nuevo CIP en desarrollo para 2026',
+                    'Proyecto de turismo ecológico',
+                    'Ubicado en la costa de Nayarit',
+                    'Enfoque en sustentabilidad y naturaleza',
+                    'Complemento a la Riviera Nayarit'
+                ],
+                images: [
+                    'https://images.unsplash.com/photo-1473496169904-658ba7c44d8a?w=800',
+                    'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800',
+                    'https://images.unsplash.com/photo-1506953823976-52e1fdc0149a?w=800'
+                ],
+                details: {
+                    superficie: '5,000 hectáreas',
+                    poblacion: 'En desarrollo',
+                    cuartosHotel: '3,000 proyectados',
+                    visitantesAnuales: '1 millón proyectado'
+                }
+            }
+        ];
+
+        /* ============================================
+           FUNCIONES DE ZOOM SUAVE
+        ============================================ */
+        function smoothFlyTo(latlng, targetZoom) {
+            map.flyTo(latlng, targetZoom || Math.max(map.getZoom(), 10), {
+                animate: true,
+                duration: 1.2,
+                easeLinearity: 0.25
+            });
+        }
+
+        /* ============================================
+           FUNCIONES PARA DISOLVER MARCADORES
+        ============================================ */
+        function dissolveMarker(marker, isVisible) {
+            const element = marker.getElement();
+            if (!element) return;
+
+            if (isVisible) {
+                element.style.opacity = '1';
+                element.style.pointerEvents = 'auto';
+            } else {
+                element.style.opacity = '0.12';
+                element.style.pointerEvents = 'none';
+            }
+        }
+
+        /* ============================================
+           INICIALIZACIÓN DEL MAPA (Map Setup)
+        ============================================ */
+        const map = L.map('map', {
+            zoomControl: true,
+            scrollWheelZoom: true,
+            minZoom: 4,
+            maxZoom: 18
+        }).setView([23.6345, -102.5528], 5);
+
+        // Capas base
+        const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            maxZoom: 19
+        }).addTo(map);
+
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 19
+        });
+
+        let currentBasemap = 'street';
+
+        // Reposicionar controles de zoom
+        map.zoomControl.setPosition('bottomleft');
+
+        // Variables para vista inicial
+        const initialView = {
+            center: [23.6345, -102.5528],
+            zoom: 5
+        };
+
+        // Almacenamiento de marcadores
+        const markers = {};
+
+        /* ============================================
+           CREACIÓN DE MARCADORES (Markers)
+        ============================================ */
+        function createMarker(site) {
+            const markerClass = site.type === 'Marina' ? 'custom-marker marina' : 'custom-marker';
+            const customIcon = L.divIcon({
+                className: markerClass,
+                html: '',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+
+            const marker = L.marker([site.lat, site.lng], { icon: customIcon })
+                .bindPopup(createPopupContent(site));
+
+            marker.siteId = site.id;
+            marker.siteData = site;
+
+            marker.on('click', function() {
+                handleMarkerClick(site.id);
+            });
+
+            markers[site.id] = marker;
+            marker.addTo(map);
+        }
+
+        /* ============================================
+           CONTENIDO DEL POPUP (Popup Content)
+        ============================================ */
+        function createPopupContent(site) {
+            const infoItems = site.info.map(item => `<li>${item}</li>`).join('');
+            return `
+                <div class="info-popup">
+                    <div class="popup-title">${site.name}</div>
+                    <div class="popup-content">
+                        <strong>Estado:</strong> ${site.state}<br>
+                        <strong>Año:</strong> ${site.year}<br>
+                        <strong>Tipo:</strong> ${site.type}<br><br>
+                        <ul class="popup-list">
+                            ${infoItems}
+                        </ul>
+                    </div>
+                    <div class="popup-footer">Fuente: FONATUR</div>
+                </div>
+            `;
+        }
+
+        /* ============================================
+           CARRUSELES (Carousel Management)
+        ============================================ */
+        const carouselStates = {};
+
+        function initCardCarousel(siteId) {
+            if (!carouselStates[siteId]) {
+                carouselStates[siteId] = { currentIndex: 0 };
+                startCarousel(siteId);
+            }
+        }
+
+        function startCarousel(siteId) {
+            setInterval(() => {
+                const site = fonaturaData.find(s => s.id === siteId);
+                if (!site || !site.images) return;
+
+                carouselStates[siteId].currentIndex = (carouselStates[siteId].currentIndex + 1) % site.images.length;
+                updateCardCarousel(siteId);
+            }, 3000);
+        }
+
+        function updateCardCarousel(siteId) {
+            const images = document.querySelectorAll(`#carousel-${siteId} img`);
+            const dots = document.querySelectorAll(`#carousel-${siteId} .carousel-dot`);
+            const currentIndex = carouselStates[siteId].currentIndex;
+
+            images.forEach((img, i) => {
+                img.classList.toggle('active', i === currentIndex);
+            });
+
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === currentIndex);
+            });
+        }
+
+        /* ============================================
+           RENDERIZADO DE LISTA (List Rendering)
+        ============================================ */
+        function renderSitesList() {
+            const container = document.getElementById('sitesList');
+            const filteredSites = getFilteredSites();
+            
+            if (filteredSites.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: #95a5a6;"><p>No se encontraron desarrollos con los filtros actuales.</p></div>';
+                return;
+            }
+
+            container.innerHTML = filteredSites.map(site => {
+                const imagesHTML = site.images ? site.images.map((img, i) => 
+                    `<img src="${img}" alt="${site.name}" class="${i === 0 ? 'active' : ''}" loading="lazy">`
+                ).join('') : '';
+
+                const dotsHTML = site.images ? site.images.map((_, i) => 
+                    `<div class="carousel-dot ${i === 0 ? 'active' : ''}"></div>`
+                ).join('') : '';
+
+                return `
+                    <div class="site-card" data-id="${site.id}">
+                        ${site.images ? `
+                        <div class="card-carousel" id="carousel-${site.id}">
+                            ${imagesHTML}
+                            <div class="carousel-indicators">
+                                ${dotsHTML}
+                            </div>
+                        </div>` : ''}
+                        <div class="site-header" onclick="handleCardClick(${site.id})">
+                            <div>
+                                <div class="site-name">${site.name}</div>
+                                <div class="site-state">${site.state}</div>
+                                <div class="site-year">Inaugurado: ${site.year}</div>
+                            </div>
+                            <div class="site-badge">${site.type}</div>
+                        </div>
+                        <button class="view-more-btn" onclick="openDetailModal(${site.id})">Ver más detalles</button>
+                    </div>
+                `;
+            }).join('');
+
+            // Inicializar carruseles
+            filteredSites.forEach(site => {
+                if (site.images) {
+                    initCardCarousel(site.id);
+                }
+            });
+
+            updateStats(filteredSites.length);
+        }
+
+        /* ============================================
+           FILTRADO DE DATOS (Data Filtering)
+        ============================================ */
+        function getFilteredSites() {
+            return fonaturaData.filter(site => {
+                const matchesType = AppState.currentFilter === 'all' || site.type === AppState.currentFilter;
+                const matchesYear = parseInt(site.year) <= AppState.currentYear;
+                const matchesSearch = !AppState.searchTerm || 
+                    site.name.toLowerCase().includes(AppState.searchTerm.toLowerCase()) ||
+                    site.state.toLowerCase().includes(AppState.searchTerm.toLowerCase()) ||
+                    site.type.toLowerCase().includes(AppState.searchTerm.toLowerCase());
+                
+                return matchesType && matchesYear && matchesSearch;
+            });
+        }
+
+        /* ============================================
+           ACTUALIZACIÓN DE MARCADORES (Update Markers)
+        ============================================ */
+        function updateMarkers() {
+            const filteredSites = getFilteredSites();
+            const visibleIds = filteredSites.map(s => s.id);
+
+            Object.keys(markers).forEach(id => {
+                const marker = markers[id];
+                const isVisible = visibleIds.includes(parseInt(id));
+                
+                if (isVisible) {
+                    if (!map.hasLayer(marker)) {
+                        marker.addTo(map);
+                    }
+                    marker.getElement().classList.remove('filtered');
+                } else {
+                    marker.getElement().classList.add('filtered');
+                }
+            });
+
+            AppState.visibleSites = filteredSites;
+        }
+
+        /* ============================================
+           MANEJO DE EVENTOS (Event Handlers)
+        ============================================ */
+        function handleCardClick(siteId) {
+            handleMarkerClick(siteId);
+        }
+
+        function handleMarkerClick(siteId) {
+            // Remover estado activo anterior
+            if (AppState.activeMarker) {
+                markers[AppState.activeMarker].getElement().classList.remove('active');
+                document.querySelectorAll('.site-card').forEach(card => {
+                    card.classList.remove('active');
+                });
+            }
+
+            // Activar nuevo marcador
+            const marker = markers[siteId];
+            marker.getElement().classList.add('active');
+            
+            // Activar tarjeta correspondiente
+            const card = document.querySelector(`.site-card[data-id="${siteId}"]`);
+            if (card) {
+                card.classList.add('active');
+                card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // Centrar mapa con offset para que el popup quede visible
+            const popupLatLng = L.latLng(marker.siteData.lat, marker.siteData.lng);
+            const popupPoint = map.project(popupLatLng, 10);
+            popupPoint.y -= 100;
+            const targetLatLng = map.unproject(popupPoint, 10);
+
+            map.setView(targetLatLng, 10, {
+                animate: true,
+                duration: 1
+            });
+
+            // Abrir popup después de centrar
+            setTimeout(() => {
+                marker.openPopup();
+            }, 500);
+
+            AppState.activeMarker = siteId;
+            updateStats();
+        }
+
+        /* ============================================
+           CONTROL DE BASEMAP (Basemap Toggle)
+        ============================================ */
+        function toggleBasemap() {
+            if (currentBasemap === 'street') {
+                map.removeLayer(streetLayer);
+                map.addLayer(satelliteLayer);
+                currentBasemap = 'satellite';
+                document.getElementById('basemapIcon').textContent = '🗺️';
+                document.getElementById('basemapLabel').textContent = 'Calles';
+            } else {
+                map.removeLayer(satelliteLayer);
+                map.addLayer(streetLayer);
+                currentBasemap = 'street';
+                document.getElementById('basemapIcon').textContent = '🛰️';
+                document.getElementById('basemapLabel').textContent = 'Satélite';
+            }
+        }
+
+        /* ============================================
+           RESET DE VISTA (Reset Map View)
+        ============================================ */
+        function resetMapView() {
+            map.setView(initialView.center, initialView.zoom, {
+                animate: true,
+                duration: 1
+            });
+
+            // Limpiar selección activa
+            if (AppState.activeMarker) {
+                markers[AppState.activeMarker].getElement().classList.remove('active');
+                document.querySelectorAll('.site-card').forEach(card => {
+                    card.classList.remove('active');
+                });
+                AppState.activeMarker = null;
+                updateStats();
+            }
+        }
+
+        /* ============================================
+           MODAL DE DETALLES (Detail Modal)
+        ============================================ */
+        let modalCarouselIndex = 0;
+        let modalCarouselInterval = null;
+
+        function openDetailModal(siteId) {
+            const site = fonaturaData.find(s => s.id === siteId);
+            if (!site) return;
+
+            const modal = document.getElementById('detailModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalSubtitle = document.getElementById('modalSubtitle');
+            const modalCarousel = document.getElementById('modalCarousel');
+            const modalBody = document.getElementById('modalBody');
+
+            modalTitle.textContent = site.name;
+            modalSubtitle.textContent = `${site.state} • ${site.type} • ${site.year}`;
+
+            // Carrusel de imágenes
+            if (site.images) {
+                modalCarousel.innerHTML = site.images.map((img, i) => 
+                    `<img src="${img}" alt="${site.name}" class="${i === 0 ? 'active' : ''}" loading="lazy">`
+                ).join('') + `
+                    <button class="carousel-nav prev" onclick="changeModalCarousel(-1)">‹</button>
+                    <button class="carousel-nav next" onclick="changeModalCarousel(1)">›</button>
+                `;
+                modalCarouselIndex = 0;
+                startModalCarousel();
+            }
+
+            // Contenido del body
+            const detailsHTML = site.details ? `
+                <div class="modal-section">
+                    <h3>Información General</h3>
+                    <div class="modal-info-grid">
+                        ${Object.entries(site.details).map(([key, value]) => `
+                            <div class="modal-info-item">
+                                <div class="modal-info-label">${formatLabel(key)}</div>
+                                <div class="modal-info-value">${value}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            const infoHTML = `
+                <div class="modal-section">
+                    <h3>Características Principales</h3>
+                    <ul class="popup-list">
+                        ${site.info.map(item => `<li>${item}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+
+            modalBody.innerHTML = detailsHTML + infoHTML;
+
+            modal.classList.add('active');
+        }
+
+        function closeDetailModal() {
+            const modal = document.getElementById('detailModal');
+            modal.classList.remove('active');
+            stopModalCarousel();
+        }
+
+        function changeModalCarousel(direction) {
+            const site = fonaturaData.find(s => s.id === AppState.activeMarker);
+            if (!site || !site.images) return;
+
+            modalCarouselIndex = (modalCarouselIndex + direction + site.images.length) % site.images.length;
+            updateModalCarousel();
+        }
+
+        function updateModalCarousel() {
+            const images = document.querySelectorAll('#modalCarousel img');
+            images.forEach((img, i) => {
+                img.classList.toggle('active', i === modalCarouselIndex);
+            });
+        }
+
+        function startModalCarousel() {
+            stopModalCarousel();
+            modalCarouselInterval = setInterval(() => {
+                changeModalCarousel(1);
+            }, 4000);
+        }
+
+        function stopModalCarousel() {
+            if (modalCarouselInterval) {
+                clearInterval(modalCarouselInterval);
+                modalCarouselInterval = null;
+            }
+        }
+
+        function formatLabel(key) {
+            const labels = {
+                superficie: 'Superficie',
+                poblacion: 'Población',
+                cuartosHotel: 'Cuartos de Hotel',
+                visitantesAnuales: 'Visitantes Anuales',
+                amarres: 'Amarres'
+            };
+            return labels[key] || key;
+        }
+
+        // Cerrar modal al hacer clic fuera
+        document.getElementById('detailModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeDetailModal();
+            }
+        });
+
+        /* ============================================
+           CONTROL DE TIMELINE (Timeline Control)
+        ============================================ */
+        document.getElementById('timelineSlider').addEventListener('input', function(e) {
+            AppState.currentYear = parseInt(e.target.value);
+            const display = document.getElementById('timelineDisplay');
+            
+            if (AppState.currentYear === 2026) {
+                display.textContent = 'Mostrando: Todos los años';
+            } else {
+                display.textContent = `Mostrando: Hasta ${AppState.currentYear}`;
+            }
+
+            updateMarkers();
+            renderSitesList();
+        });
+
+        /* ============================================
+           FILTROS POR TIPO (Type Filters)
+        ============================================ */
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', function() {
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                
+                AppState.currentFilter = this.dataset.type;
+                updateMarkers();
+                renderSitesList();
+            });
+        });
+
+        /* ============================================
+           BÚSQUEDA (Search)
+        ============================================ */
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            AppState.searchTerm = e.target.value;
+            updateMarkers();
+            renderSitesList();
+        });
+
+        /* ============================================
+           TOGGLE SIDEBAR (Sidebar Control)
+        ============================================ */
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggleBtn');
+            const toggleIcon = document.getElementById('toggleIcon');
+
+            sidebar.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            
+            if (sidebar.classList.contains('collapsed')) {
+                toggleIcon.textContent = '☰';
+            } else {
+                toggleIcon.textContent = '✕';
+            }
+
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 300);
+        }
+
+        /* ============================================
+           ACTUALIZACIÓN DE ESTADÍSTICAS (Stats Update)
+        ============================================ */
+        function updateStats(visibleCount) {
+            if (visibleCount !== undefined) {
+                document.getElementById('visibleCount').textContent = visibleCount;
+            }
+            document.getElementById('selectedCount').textContent = AppState.activeMarker ? 1 : 0;
+        }
+
+        /* ============================================
+           INICIALIZACIÓN (Initialization)
+        ============================================ */
+        fonaturaData.forEach(site => createMarker(site));
+        renderSitesList();
+        updateStats(fonaturaData.length);
+    </script>
+</body>
+</html>className: markerClass,
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+
+            const marker = L.marker([site.lat, site.lng], { icon: customIcon })
+                .addTo(map)
+                .bindPopup(createPopupContent(site));
+
+            marker.on('click', () => {
+                selectSite(site.id);
+            });
+
+            // Efecto hover en marcador
+            marker.on('mouseover', function(e) {
+                this.openPopup();
+            });
+
+            markers[site.id] = marker;
+        }
+
+        // Crear todos los marcadores
+        fonaturaData.forEach(site => createMarker(site));
+
+        // Crear contenido del popup
+        function createPopupContent(site) {
+            return `
+                <div class="info-popup">
+                    <div class="popup-title">${site.name}</div>
+                    <div class="popup-content">
+                        <strong>Estado:</strong> ${site.state}<br>
+                        <strong>Año de inicio:</strong> ${site.year}<br>
+                        <strong>Tipo:</strong> ${site.type}
+                        <ul class="popup-list">
+                            ${site.info.map(item => `<li>${item}</li>`).join('')}
+                        </ul>
+                    </div>
+                    <div class="popup-footer">
+                        Fuente: FONATUR
+                    </div>
+                </div>
+            `;
+        }
+
+        // Renderizar lista de sitios
+        function renderSitesList(sites = fonaturaData) {
+            const sitesList = document.getElementById('sitesList');
+            sitesList.innerHTML = sites.map(site => `
+                <div class="site-card" data-id="${site.id}" onclick="selectSite(${site.id})">
+                    <div class="site-header">
+                        <div>
+                            <div class="site-name">${site.name}</div>
+                            <div class="site-state">${site.state}</div>
+                            <div class="site-year">Inicio: ${site.year}</div>
+                        </div>
+                        <div class="site-badge">${site.type}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /* ============================================
+           SELECCIÓN DE SITIO (Site Selection)
+        ============================================ */
+        function selectSite(siteId) {
+            const site = fonaturaData.find(s => s.id === siteId);
+            if (!site) return;
+
+            // Actualizar marcador activo
+            if (AppState.activeMarker) {
+                const oldSite = fonaturaData.find(s => s.id === AppState.activeMarker);
+                const oldClass = oldSite.type === 'Marina' ? 'custom-marker marina' : 'custom-marker';
+                const oldIcon = L.divIcon({
+                    className: oldClass,
+                    iconSize: [28, 28],
+                    iconAnchor: [14, 14]
+                });
+                markers[AppState.activeMarker].setIcon(oldIcon);
+            }
+
+            const activeIcon = L.divIcon({
+                className: 'custom-marker active',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14]
+            });
+            markers[siteId].setIcon(activeIcon);
+            AppState.activeMarker = siteId;
+
+            // Actualizar estadística
+            document.getElementById('selectedCount').textContent = '1';
+
+            // Actualizar card activo
+            document.querySelectorAll('.site-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            const activeCard = document.querySelector(`.site-card[data-id="${siteId}"]`);
+            if (activeCard) {
+                activeCard.classList.add('active');
+                activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            // Guardar referencia al marcador en el sitio para uso posterior
+            site._marker = markers[siteId];
+
+            // Zoom suave con flyTo
+            smoothFlyTo([site.lat, site.lng], 10);
+
+            // Abrir popup después del zoom
+            setTimeout(() => {
+                markers[siteId].openPopup();
+            }, 1300);
+        }
+
+        /* ============================================
+           FILTROS Y BÚSQUEDA (Filtering)
+        ============================================ */
+        
+        // Búsqueda en tiempo real
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            AppState.searchTerm = e.target.value.toLowerCase();
+            applyFilters();
+        });
+
+        // Timeline slider
+        document.getElementById('timelineSlider').addEventListener('input', (e) => {
+            AppState.currentYear = parseInt(e.target.value);
+            const display = document.getElementById('timelineDisplay');
+            
+            if (AppState.currentYear === 2010) {
+                display.textContent = 'Mostrando: Todos los años';
+            } else {
+                display.textContent = `Mostrando: ${AppState.currentYear} - ${AppState.currentYear + 9}`;
+            }
+            
+            applyFilters();
+        });
+
+        // Chips de filtro por tipo
+        document.querySelectorAll('.filter-chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                // Actualizar UI
+                document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                
+                // Actualizar estado
+                AppState.currentFilter = chip.dataset.type;
+                applyFilters();
+            });
+        });
+
+        // Aplicar todos los filtros
+        function applyFilters() {
+            let filteredSites = fonaturaData;
+
+            // Filtro por tipo
+            if (AppState.currentFilter !== 'all') {
+                filteredSites = filteredSites.filter(site => site.type === AppState.currentFilter);
+            }
+
+            // Filtro por año
+            if (AppState.currentYear < 2010) {
+                filteredSites = filteredSites.filter(site => {
+                    const siteYear = parseInt(site.year);
+                    return siteYear >= AppState.currentYear && siteYear < AppState.currentYear + 10;
+                });
+            }
+
+            // Filtro por búsqueda
+            if (AppState.searchTerm) {
+                filteredSites = filteredSites.filter(site => 
+                    site.name.toLowerCase().includes(AppState.searchTerm) ||
+                    site.state.toLowerCase().includes(AppState.searchTerm) ||
+                    site.type.toLowerCase().includes(AppState.searchTerm)
+                );
+            }
+
+            AppState.visibleSites = filteredSites;
+            
+            // Actualizar vista
+            renderSitesList(filteredSites);
+            updateMarkerVisibility(filteredSites);
+            updateStats(filteredSites);
+        }
+
+        // Actualizar visibilidad de marcadores con efecto de disolución
+        function updateMarkerVisibility(visibleSites) {
+            const visibleIds = visibleSites.map(s => s.id);
+            
+            fonaturaData.forEach(site => {
+                const marker = markers[site.id];
+                const isVisible = visibleIds.includes(site.id);
+                
+                // Aplicar efecto de disolución en lugar de ocultar
+                dissolveMarker(marker, isVisible);
+                
+                const markerElement = marker.getElement();
+                if (markerElement) {
+                    if (isVisible) {
+                        markerElement.classList.remove('filtered');
+                    } else {
+                        markerElement.classList.add('filtered');
+                    }
+                }
+            });
+        }
+
+        // Actualizar estadísticas
+        function updateStats(visibleSites) {
+            document.getElementById('visibleCount').textContent = visibleSites.length;
+        }
+
+        /* ============================================
+           TOGGLE SIDEBAR (UI Control)
+        ============================================ */
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const toggleBtn = document.getElementById('toggleBtn');
+            const toggleIcon = document.getElementById('toggleIcon');
+            
+            sidebar.classList.toggle('collapsed');
+            toggleBtn.classList.toggle('collapsed');
+            
+            toggleIcon.textContent = sidebar.classList.contains('collapsed') ? '☰' : '✕';
+            
+            // Invalidar tamaño del mapa con animación
+            setTimeout(() => {
+                map.invalidateSize();
+            }, 450);
+        }
+
+        /* ============================================
+           INICIALIZACIÓN DE LA APLICACIÓN
+        ============================================ */
+        function initApp() {
+            // Renderizar lista inicial
+            renderSitesList(fonaturaData);
+            
+            // Establecer visibles iniciales
+            AppState.visibleSites = fonaturaData;
+            
+            // Actualizar estadísticas
+            updateStats(fonaturaData);
+            
+            // Log de inicialización
+            console.log('✅ Geoportal FONATUR inicializado');
+            console.log(`📊 ${fonaturaData.length} desarrollos cargados`);
+        }
+
+        // Iniciar aplicación
+        initApp();
+    </script>
+</body>
+</html>
